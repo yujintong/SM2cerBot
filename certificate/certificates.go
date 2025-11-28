@@ -213,6 +213,78 @@ func (c *Certifier) Obtain(request ObtainRequest) (*Resource, error) {
 	return cert, failures.Join()
 }
 
+// 新增方法
+func (c *Certifier) ObtainForSm2(domains []string, request api.OrderWithCsrOptions) (*acme.Order, error) {
+	// if request.CSR == nil {
+	// 	return nil, errors.New("cannot obtain resource for CSR: CSR is missing")
+	// }
+
+	// figure out what domains it concerns
+	// start with the common name
+	// domains := certcrypto.ExtractDomainsCSR(request.CSR)
+
+	// if request.Bundle {
+	// 	log.Infof("[%s] acme: Obtaining bundled SAN certificate given a CSR", strings.Join(domains, ", "))
+	// } else {
+	// 	log.Infof("[%s] acme: Obtaining SAN certificate given a CSR", strings.Join(domains, ", "))
+	// }
+
+	// orderOpts := &api.OrderWithCsrOptions{
+	// 	NotBefore:      request.NotBefore,
+	// 	NotAfter:       request.NotAfter,
+	// 	Profile:        request.Profile,
+	// 	ReplacesCertID: request.ReplacesCertID,
+	// }
+
+	order, err := c.core.Orders.NewWithCsrOption(domains, &request)
+	if err != nil {
+		return nil, err
+	}
+
+	authz, err := c.getAuthorizations(order)
+	if err != nil {
+		// If any challenge fails, return. Do not generate partial SAN certificates.
+		// c.deactivateAuthorizations(order, request.AlwaysDeactivateAuthorizations)
+		return nil, err
+	}
+
+	err = c.resolver.Solve(authz)
+	if err != nil {
+		// If any challenge fails, return. Do not generate partial SAN certificates.
+		// c.deactivateAuthorizations(order, request.AlwaysDeactivateAuthorizations)
+		return nil, err
+	}
+
+	log.Infof("[%s] acme: Validations succeeded; requesting certificates", strings.Join(domains, ", "))
+
+	// failures := newObtainError()
+
+	// var privateKey []byte
+	// if request.PrivateKey != nil {
+	// 	privateKey = certcrypto.PEMEncode(request.PrivateKey)
+	// }
+
+	// cert, err := c.getForCSR(domains, order, request.Bundle, request.CSR.Raw, privateKey, request.PreferredChain)
+	// if err != nil {
+	// 	for _, auth := range authz {
+	// 		failures.Add(challenge.GetTargetedDomain(auth), err)
+	// 	}
+	// }
+
+	// if request.AlwaysDeactivateAuthorizations {
+	// 	c.deactivateAuthorizations(order, true)
+	// }
+
+	// if cert != nil {
+	// 	// Add the CSR to the certificate so that it can be used for renewals.
+	// 	cert.CSR = certcrypto.PEMEncode(request.CSR)
+	// }
+
+	// return cert, failures.Join()
+
+	return &order.Order, nil
+}
+
 // ObtainForCSR tries to obtain a certificate matching the CSR passed into it.
 //
 // The domains are inferred from the CommonName and SubjectAltNames, if any.

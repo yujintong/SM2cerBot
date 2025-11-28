@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/go-acme/lego/v4/certificate"
@@ -133,22 +130,32 @@ func run(ctx *cli.Context) error {
 	certsStorage := NewCertificatesStorage(ctx)
 	certsStorage.CreateRootFolder()
 
-	cert, err := obtainCertificate(ctx, client)
+	// cert, err := obtainCertificate(ctx, client)
+	// if err != nil {
+	// 	// Make sure to return a non-zero exit code if ObtainSANCertificate returned at least one error.
+	// 	// Due to us not returning partial certificate we can just exit here instead of at the end.
+	// 	log.Fatalf("Could not obtain certificates:\n\t%v", err)
+	// }
+
+	// certsStorage.SaveResource(cert)
+
+	// meta := map[string]string{
+	// 	hookEnvAccountEmail: account.Email,
+	// }
+
+	// addPathToMetadata(meta, cert.Domain, cert, certsStorage)
+
+	// return launchHook(ctx.String(flgRunHook), ctx.Duration(flgRunHookTimeout), meta)
+
+	_, err := obtainCertificate(ctx, client)
+
 	if err != nil {
 		// Make sure to return a non-zero exit code if ObtainSANCertificate returned at least one error.
 		// Due to us not returning partial certificate we can just exit here instead of at the end.
 		log.Fatalf("Could not obtain certificates:\n\t%v", err)
 	}
 
-	certsStorage.SaveResource(cert)
-
-	meta := map[string]string{
-		hookEnvAccountEmail: account.Email,
-	}
-
-	addPathToMetadata(meta, cert.Domain, cert, certsStorage)
-
-	return launchHook(ctx.String(flgRunHook), ctx.Duration(flgRunHookTimeout), meta)
+	return nil
 }
 
 func handleTOS(ctx *cli.Context, client *lego.Client) bool {
@@ -157,28 +164,30 @@ func handleTOS(ctx *cli.Context, client *lego.Client) bool {
 		return true
 	}
 
-	reader := bufio.NewReader(os.Stdin)
+	// reader := bufio.NewReader(os.Stdin)
 
-	log.Printf("Please review the TOS at %s", client.GetToSURL())
+	// log.Printf("Please review the TOS at %s", client.GetToSURL())
 
-	for {
-		fmt.Println("Do you accept the TOS? Y/n")
+	// for {
+	// 	fmt.Println("Do you accept the TOS? Y/n")
 
-		text, err := reader.ReadString('\n')
-		if err != nil {
-			log.Fatalf("Could not read from console: %v", err)
-		}
+	// 	text, err := reader.ReadString('\n')
+	// 	if err != nil {
+	// 		log.Fatalf("Could not read from console: %v", err)
+	// 	}
 
-		text = strings.Trim(text, "\r\n")
-		switch text {
-		case "", "y", "Y":
-			return true
-		case "n", "N":
-			return false
-		default:
-			fmt.Println("Your input was invalid. Please answer with one of Y/y, n/N or by pressing enter.")
-		}
-	}
+	// 	text = strings.Trim(text, "\r\n")
+	// 	switch text {
+	// 	case "", "y", "Y":
+	// 		return true
+	// 	case "n", "N":
+	// 		return false
+	// 	default:
+	// 		fmt.Println("Your input was invalid. Please answer with one of Y/y, n/N or by pressing enter.")
+	// 	}
+	// }
+
+	return true
 }
 
 func register(ctx *cli.Context, client *lego.Client) (*registration.Resource, error) {

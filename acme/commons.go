@@ -199,6 +199,12 @@ type Order struct {
 	// previously-issued certificate which this order is intended to replace.
 	// - https://www.rfc-editor.org/rfc/rfc9773.html#section-5
 	Replaces string `json:"replaces,omitempty"`
+
+	
+	//TODO: 添加内容
+	CertificateSign    string `json:"certificateSign,omitempty"`
+	CertificateEncrypt string `json:"certificateEncrypt,omitempty"`
+	KeyEnvelopEncrypt  string `json:"keyEnvelopEncrypt,omitempty"`
 }
 
 func (r *Order) Err() error {
@@ -308,6 +314,7 @@ func (c *Challenge) Err() error {
 type Identifier struct {
 	Type  string `json:"type"`
 	Value string `json:"value"`
+	ChallengeType string `json:"challengeType"`
 }
 
 // CSRMessage Certificate Signing Request.
