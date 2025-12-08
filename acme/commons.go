@@ -200,7 +200,6 @@ type Order struct {
 	// - https://www.rfc-editor.org/rfc/rfc9773.html#section-5
 	Replaces string `json:"replaces,omitempty"`
 
-	
 	//TODO: 添加内容
 	CertificateSign    string `json:"certificateSign,omitempty"`
 	CertificateEncrypt string `json:"certificateEncrypt,omitempty"`
@@ -240,7 +239,7 @@ type Authorization struct {
 	// Each array entry is an object with parameters required to validate the challenge.
 	// A client should attempt to fulfill one of these challenges,
 	// and a server should consider any one of the challenges sufficient to make the authorization valid.
-	Challenges []Challenge `json:"challenges,omitempty"`
+	Challenge Challenge `json:"challenge"`
 
 	// wildcard (optional, boolean):
 	// For authorizations created as a result of a newOrder request containing a DNS identifier
@@ -297,6 +296,11 @@ type Challenge struct {
 	// https://www.rfc-editor.org/rfc/rfc8555.html#section-8.4
 	Token string `json:"token"`
 
+	TokenPath string `json:"tokenPath"`
+
+	//挑战类型
+	TokenType string `json:"tokenType"`
+
 	// https://www.rfc-editor.org/rfc/rfc8555.html#section-8.1
 	KeyAuthorization string `json:"keyAuthorization"`
 }
@@ -312,8 +316,8 @@ func (c *Challenge) Err() error {
 // Identifier the ACME identifier object.
 // - https://www.rfc-editor.org/rfc/rfc8555.html#section-9.7.7
 type Identifier struct {
-	Type  string `json:"type"`
-	Value string `json:"value"`
+	Type          string `json:"type"`
+	Value         string `json:"value"`
 	ChallengeType string `json:"challengeType"`
 }
 

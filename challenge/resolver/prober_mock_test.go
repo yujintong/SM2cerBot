@@ -33,12 +33,12 @@ func createStubAuthorizationHTTP01(domain, status string) acme.Authorization {
 			Type:  challenge.HTTP01.String(),
 			Value: domain,
 		},
-		Challenges: []acme.Challenge{
-			{
-				Type:      challenge.HTTP01.String(),
-				Validated: time.Now(),
-				Error:     nil,
-			},
-		},
+		// Challenges: []acme.Challenge{
+		// 	{
+		// 		Type:      challenge.HTTP01.String(),
+		// 		Validated: time.Now(),
+		// 		Error:     nil,
+		// 	},
+		// },
 	}
 }

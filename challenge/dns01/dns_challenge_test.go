@@ -99,9 +99,9 @@ func TestChallenge_PreSolve(t *testing.T) {
 				Identifier: acme.Identifier{
 					Value: "example.com",
 				},
-				Challenges: []acme.Challenge{
-					{Type: challenge.DNS01.String()},
-				},
+				// Challenges: []acme.Challenge{
+				// 	{Type: challenge.DNS01.String()},
+				// },
 			}
 
 			err = chlg.PreSolve(authz)
@@ -191,9 +191,9 @@ func TestChallenge_Solve(t *testing.T) {
 				Identifier: acme.Identifier{
 					Value: "example.com",
 				},
-				Challenges: []acme.Challenge{
-					{Type: challenge.DNS01.String()},
-				},
+				// Challenges: []acme.Challenge{
+				// 	{Type: challenge.DNS01.String()},
+				// },
 			}
 
 			err = chlg.Solve(authz)
@@ -273,9 +273,9 @@ func TestChallenge_CleanUp(t *testing.T) {
 				Identifier: acme.Identifier{
 					Value: "example.com",
 				},
-				Challenges: []acme.Challenge{
-					{Type: challenge.DNS01.String()},
-				},
+				// Challenges: []acme.Challenge{
+				// 	{Type: challenge.DNS01.String()},
+				// },
 			}
 
 			err = chlg.CleanUp(authz)

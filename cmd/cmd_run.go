@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/go-acme/lego/v4/acme"
+	"github.com/go-acme/lego/v4/acme/api"
 	"github.com/go-acme/lego/v4/certificate"
 	"github.com/go-acme/lego/v4/lego"
 	"github.com/go-acme/lego/v4/log"
@@ -158,43 +161,8 @@ func run(ctx *cli.Context) error {
 	return nil
 }
 
-func handleTOS(ctx *cli.Context, client *lego.Client) bool {
-	// Check for a global accept override
-	if ctx.Bool(flgAcceptTOS) {
-		return true
-	}
-
-	// reader := bufio.NewReader(os.Stdin)
-
-	// log.Printf("Please review the TOS at %s", client.GetToSURL())
-
-	// for {
-	// 	fmt.Println("Do you accept the TOS? Y/n")
-
-	// 	text, err := reader.ReadString('\n')
-	// 	if err != nil {
-	// 		log.Fatalf("Could not read from console: %v", err)
-	// 	}
-
-	// 	text = strings.Trim(text, "\r\n")
-	// 	switch text {
-	// 	case "", "y", "Y":
-	// 		return true
-	// 	case "n", "N":
-	// 		return false
-	// 	default:
-	// 		fmt.Println("Your input was invalid. Please answer with one of Y/y, n/N or by pressing enter.")
-	// 	}
-	// }
-
-	return true
-}
-
 func register(ctx *cli.Context, client *lego.Client) (*registration.Resource, error) {
-	accepted := handleTOS(ctx, client)
-	if !accepted {
-		log.Fatal("You did not accept the TOS. Unable to proceed.")
-	}
+	accepted := true
 
 	if ctx.Bool(flgEAB) {
 		kid := ctx.String(flgKID)
@@ -214,60 +182,114 @@ func register(ctx *cli.Context, client *lego.Client) (*registration.Resource, er
 	return client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
 }
 
+// func obtainCertificate(ctx *cli.Context, client *lego.Client) (*certificate.Resource, error) {
+// 	bundle := !ctx.Bool(flgNoBundle)
+
+// 	domains := ctx.StringSlice(flgDomains)
+// 	if len(domains) > 0 {
+// 		// obtain a certificate, generating a new private key
+// 		request := certificate.ObtainRequest{
+// 			Domains:                        domains,
+// 			MustStaple:                     ctx.Bool(flgMustStaple),
+// 			NotBefore:                      getTime(ctx, flgNotBefore),
+// 			NotAfter:                       getTime(ctx, flgNotAfter),
+// 			Bundle:                         bundle,
+// 			PreferredChain:                 ctx.String(flgPreferredChain),
+// 			Profile:                        ctx.String(flgProfile),
+// 			AlwaysDeactivateAuthorizations: ctx.Bool(flgAlwaysDeactivateAuthorizations),
+// 		}
+
+// 		if ctx.IsSet(flgPrivateKey) {
+// 			var err error
+
+// 			request.PrivateKey, err = loadPrivateKey(ctx.String(flgPrivateKey))
+// 			if err != nil {
+// 				return nil, fmt.Errorf("load private key: %w", err)
+// 			}
+// 		}
+
+// 		return client.Certificate.Obtain(request)
+// 	}
+
+// 	// read the CSR
+// 	csr, err := readCSRFile(ctx.String(flgCSR))
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	// obtain a certificate for this CSR
+// 	request := certificate.ObtainForCSRRequest{
+// 		CSR:                            csr,
+// 		NotBefore:                      getTime(ctx, flgNotBefore),
+// 		NotAfter:                       getTime(ctx, flgNotAfter),
+// 		Bundle:                         bundle,
+// 		PreferredChain:                 ctx.String(flgPreferredChain),
+// 		Profile:                        ctx.String(flgProfile),
+// 		AlwaysDeactivateAuthorizations: ctx.Bool(flgAlwaysDeactivateAuthorizations),
+// 	}
+
+// 	if ctx.IsSet(flgPrivateKey) {
+// 		var err error
+
+// 		request.PrivateKey, err = loadPrivateKey(ctx.String(flgPrivateKey))
+// 		if err != nil {
+// 			return nil, fmt.Errorf("load private key: %w", err)
+// 		}
+// 	}
+
+// 	return client.Certificate.ObtainForCSR(request)
+// }
+
 func obtainCertificate(ctx *cli.Context, client *lego.Client) (*certificate.Resource, error) {
-	bundle := !ctx.Bool(flgNoBundle)
+	// bundle := !ctx.Bool(flgNoBundle)
 
 	domains := ctx.StringSlice(flgDomains)
-	if len(domains) > 0 {
-		// obtain a certificate, generating a new private key
-		request := certificate.ObtainRequest{
-			Domains:                        domains,
-			MustStaple:                     ctx.Bool(flgMustStaple),
-			NotBefore:                      getTime(ctx, flgNotBefore),
-			NotAfter:                       getTime(ctx, flgNotAfter),
-			Bundle:                         bundle,
-			PreferredChain:                 ctx.String(flgPreferredChain),
-			Profile:                        ctx.String(flgProfile),
-			AlwaysDeactivateAuthorizations: ctx.Bool(flgAlwaysDeactivateAuthorizations),
-		}
 
-		if ctx.IsSet(flgPrivateKey) {
-			var err error
-
-			request.PrivateKey, err = loadPrivateKey(ctx.String(flgPrivateKey))
-			if err != nil {
-				return nil, fmt.Errorf("load private key: %w", err)
-			}
-		}
-
-		return client.Certificate.Obtain(request)
+	var identifiers = []acme.Identifier{
+		{
+			Type:          "dns",
+			Value:         domains[0],
+			ChallengeType: "http-01",
+		},
 	}
 
-	// read the CSR
-	csr, err := readCSRFile(ctx.String(flgCSR))
+	req := acme.CertRequest{
+		CommonName: domains[0],
+	}
+
+	eccCsr, _, err := acme.CreateCSR(acme.ECC, 256, req)
 	if err != nil {
-		return nil, err
+		log.Fatalf("Failed to create ECC CSR: %v", err)
 	}
 
-	// obtain a certificate for this CSR
-	request := certificate.ObtainForCSRRequest{
-		CSR:                            csr,
-		NotBefore:                      getTime(ctx, flgNotBefore),
-		NotAfter:                       getTime(ctx, flgNotAfter),
-		Bundle:                         bundle,
-		PreferredChain:                 ctx.String(flgPreferredChain),
-		Profile:                        ctx.String(flgProfile),
-		AlwaysDeactivateAuthorizations: ctx.Bool(flgAlwaysDeactivateAuthorizations),
+	sm2SignCsr, _, err := acme.CreateCSR(acme.SM2, 256, req)
+	if err != nil {
+		log.Fatalf("Failed to create SM2 CSR: %v", err)
 	}
 
-	if ctx.IsSet(flgPrivateKey) {
-		var err error
-
-		request.PrivateKey, err = loadPrivateKey(ctx.String(flgPrivateKey))
-		if err != nil {
-			return nil, fmt.Errorf("load private key: %w", err)
-		}
+	sm2EncCsr, _, err := acme.CreateCSR(acme.SM2, 256, req)
+	if err != nil {
+		log.Fatalf("Failed to create SM2 CSR: %v", err)
 	}
 
-	return client.Certificate.ObtainForCSR(request)
+	request := api.OrderWithCsrOptions{
+		Csr:         eccCsr,
+		CsrSign:     sm2SignCsr,
+		CsrEncrypt:  sm2EncCsr,
+		Identifiers: identifiers,
+	}
+
+	order, err := client.Certificate.ObtainForSm2(domains, request)
+	if err != nil {
+		log.Logger.Fatalf("Failed to send order request: %v", err)
+	}
+
+	jsonData, err := json.Marshal(order)
+	if err != nil {
+		log.Logger.Fatalf("Failed json marshal: %v", err)
+	}
+
+	fmt.Println(string(jsonData))
+
+	return nil, nil
 }

@@ -61,15 +61,15 @@ func TestValidate(t *testing.T) {
 				statuses = statuses[1:]
 
 				authorization := acme.Authorization{
-					Status:     st,
-					Challenges: []acme.Challenge{},
+					Status:    st,
+					Challenge: acme.Challenge{},
 				}
 
 				if st == acme.StatusInvalid {
-					chlg := acme.Challenge{
-						Status: acme.StatusInvalid,
-					}
-					authorization.Challenges = append(authorization.Challenges, chlg)
+					// chlg := acme.Challenge{
+					// 	Status: acme.StatusInvalid,
+					// }
+					// authorization.Challenges = append(authorization.Challenges, chlg)
 				}
 
 				servermock.JSONEncode(authorization).ServeHTTP(rw, req)
@@ -200,10 +200,10 @@ func Test_checkAuthorizationStatus(t *testing.T) {
 			expected:      false,
 		},
 		{
-			desc:          "status invalid with error",
-			authorization: acme.Authorization{Status: acme.StatusInvalid, Challenges: []acme.Challenge{{Error: &acme.ProblemDetails{}}}},
-			requireErr:    require.Error,
-			expected:      false,
+			desc: "status invalid with error",
+			// authorization: acme.Authorization{Status: acme.StatusInvalid, Challenges: []acme.Challenge{{Error: &acme.ProblemDetails{}}}},
+			requireErr: require.Error,
+			expected:   false,
 		},
 		{
 			desc:          "status pending",

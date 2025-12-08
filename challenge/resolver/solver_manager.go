@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"time"
 
@@ -63,17 +62,18 @@ func (c *SolverManager) Remove(chlgType challenge.Type) {
 // Checks all challenges from the server in order and returns the first matching solver.
 func (c *SolverManager) chooseSolver(authz acme.Authorization) solver {
 	// Allow to have a deterministic challenge order
-	sort.Sort(byType(authz.Challenges))
 
-	domain := challenge.GetTargetedDomain(authz)
-	for _, chlg := range authz.Challenges {
-		if solvr, ok := c.solvers[challenge.Type(chlg.Type)]; ok {
-			log.Infof("[%s] acme: use %s solver", domain, chlg.Type)
-			return solvr
-		}
+	// sort.Sort(byType(authz.Challenges))
 
-		log.Infof("[%s] acme: Could not find solver for: %s", domain, chlg.Type)
-	}
+	// domain := challenge.GetTargetedDomain(authz)
+	// for _, chlg := range authz.Challenges {
+	// 	if solvr, ok := c.solvers[challenge.Type(chlg.Type)]; ok {
+	// 		log.Infof("[%s] acme: use %s solver", domain, chlg.Type)
+	// 		return solvr
+	// 	}
+
+	// 	log.Infof("[%s] acme: Could not find solver for: %s", domain, chlg.Type)
+	// }
 
 	return nil
 }
@@ -159,11 +159,11 @@ func checkAuthorizationStatus(authz acme.Authorization) (bool, error) {
 	case acme.StatusDeactivated, acme.StatusExpired, acme.StatusRevoked:
 		return false, fmt.Errorf("the authorization state %s", authz.Status)
 	case acme.StatusInvalid:
-		for _, chlg := range authz.Challenges {
-			if chlg.Status == acme.StatusInvalid && chlg.Error != nil {
-				return false, fmt.Errorf("invalid authorization: %w", chlg.Err())
-			}
-		}
+		// for _, chlg := range authz.Challenges {
+		// 	if chlg.Status == acme.StatusInvalid && chlg.Error != nil {
+		// 		return false, fmt.Errorf("invalid authorization: %w", chlg.Err())
+		// 	}
+		// }
 
 		return false, errors.New("invalid authorization")
 	default:

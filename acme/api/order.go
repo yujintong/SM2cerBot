@@ -41,8 +41,10 @@ type OrderWithCsrOptions struct {
 
 	Identifiers []acme.Identifier `json:"identifiers"`
 	Csr         string            `json:"csr"`
-	CsrSign     string            `json:"csrSign"`
-	CsrEncrypt  string            `json:"csrEncrypt"`
+
+	// tode: add
+	CsrSign    string `json:"csrSign"`
+	CsrEncrypt string `json:"csrEncrypt"`
 	// Domains     string
 }
 
@@ -157,11 +159,11 @@ func (o *OrderService) UpdateForCSR(orderURL string, csr []byte) (acme.ExtendedO
 	return acme.ExtendedOrder{Order: order}, nil
 }
 
-
 // New order with csr
 func (o *OrderService) NewWithCsrOption(domains []string, opts *OrderWithCsrOptions) (acme.ExtendedOrder, error) {
 	// orderReq := acme.Order{Identifiers: createIdentifiers(domains)}
 
+	var order acme.Order
 	if opts == nil {
 		// return nil, errors.New("cannot obtain resource for CSR: CSR is missing")
 
@@ -181,8 +183,6 @@ func (o *OrderService) NewWithCsrOption(domains []string, opts *OrderWithCsrOpti
 		// 		orderReq.Profile = opts.Profile
 		// 	}
 	}
-
-	var order acme.Order
 
 	resp, err := o.core.post(o.core.GetDirectory().NewOrderURL, opts, &order)
 	if err != nil {
@@ -221,6 +221,20 @@ func (o *OrderService) NewWithCsrOption(domains []string, opts *OrderWithCsrOpti
 	// 		fmt.Errorf("order identifiers have been modified by the ACME server (RFC8555 §7.4): %+v != %+v",
 	// 			orderReq.Identifiers, order.Identifiers)
 	// }
+
+	return acme.ExtendedOrder{
+		Order:    order,
+		Location: resp.Header.Get("Location"),
+	}, nil
+}
+
+func (o *OrderService) GetOrderStatus(url string) (acme.ExtendedOrder, error) {
+
+	var order acme.Order
+	resp, err := o.core.post(url, "", &order)
+	if err != nil {
+
+	}
 
 	return acme.ExtendedOrder{
 		Order:    order,

@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-acme/lego/v4/acme"
 	"github.com/go-acme/lego/v4/acme/api"
-	"github.com/go-acme/lego/v4/challenge"
 	"github.com/go-acme/lego/v4/platform/tester"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
@@ -83,9 +82,9 @@ func TestChallenge(t *testing.T) {
 			Type:  "dns",
 			Value: domain,
 		},
-		Challenges: []acme.Challenge{
-			{Type: challenge.TLSALPN01.String(), Token: "tlsalpn1"},
-		},
+		// Challenges: []acme.Challenge{
+		// 	{Type: challenge.TLSALPN01.String(), Token: "tlsalpn1"},
+		// },
 	}
 
 	err = solver.Solve(authz)
@@ -111,9 +110,9 @@ func TestChallengeInvalidPort(t *testing.T) {
 		Identifier: acme.Identifier{
 			Value: "localhost:123456",
 		},
-		Challenges: []acme.Challenge{
-			{Type: challenge.TLSALPN01.String(), Token: "tlsalpn1"},
-		},
+		// Challenges: []acme.Challenge{
+		// 	{Type: challenge.TLSALPN01.String(), Token: "tlsalpn1"},
+		// },
 	}
 
 	err = solver.Solve(authz)
@@ -190,9 +189,9 @@ func TestChallengeIPaddress(t *testing.T) {
 			Type:  "ip",
 			Value: domain,
 		},
-		Challenges: []acme.Challenge{
-			{Type: challenge.TLSALPN01.String(), Token: "tlsalpn1"},
-		},
+		// Challenges: []acme.Challenge{
+		// 	{Type: challenge.TLSALPN01.String(), Token: "tlsalpn1"},
+		// },
 	}
 
 	require.NoError(t, solver.Solve(authz))

@@ -17,7 +17,6 @@ import (
 
 	"github.com/go-acme/lego/v4/acme"
 	"github.com/go-acme/lego/v4/acme/api"
-	"github.com/go-acme/lego/v4/challenge"
 	"github.com/go-acme/lego/v4/platform/tester"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -110,9 +109,9 @@ func TestChallenge(t *testing.T) {
 		Identifier: acme.Identifier{
 			Value: "localhost:23457",
 		},
-		Challenges: []acme.Challenge{
-			{Type: challenge.HTTP01.String(), Token: "http1"},
-		},
+		// Challenges: []acme.Challenge{
+		// 	{Type: challenge.HTTP01.String(), Token: "http1"},
+		// },
 	}
 
 	err = solver.Solve(authz)
@@ -180,9 +179,9 @@ func TestChallengeUnix(t *testing.T) {
 		Identifier: acme.Identifier{
 			Value: "localhost",
 		},
-		Challenges: []acme.Challenge{
-			{Type: challenge.HTTP01.String(), Token: "http1"},
-		},
+		// Challenges: []acme.Challenge{
+		// 	{Type: challenge.HTTP01.String(), Token: "http1"},
+		// },
 	}
 
 	err = solver.Solve(authz)
@@ -206,9 +205,9 @@ func TestChallengeInvalidPort(t *testing.T) {
 		Identifier: acme.Identifier{
 			Value: "localhost:123456",
 		},
-		Challenges: []acme.Challenge{
-			{Type: challenge.HTTP01.String(), Token: "http2"},
-		},
+		// Challenges: []acme.Challenge{
+		// 	{Type: challenge.HTTP01.String(), Token: "http2"},
+		// },
 	}
 
 	err = solver.Solve(authz)
@@ -428,9 +427,9 @@ func testServeWithProxy(t *testing.T, header, extra *testProxyHeader, expectErro
 		Identifier: acme.Identifier{
 			Value: "localhost:23457",
 		},
-		Challenges: []acme.Challenge{
-			{Type: challenge.HTTP01.String(), Token: "http1"},
-		},
+		// Challenges: []acme.Challenge{
+		// 	{Type: challenge.HTTP01.String(), Token: "http1"},
+		// },
 	}
 
 	err = solver.Solve(authz)

@@ -52,6 +52,33 @@ func (c *CertificateService) GetAll(certURL string, bundle bool) (map[string]*ac
 	return certs, nil
 }
 
+func (c *CertificateService) GetAllSm2Certs(order acme.ExtendedOrder, bundle bool) (map[string]*acme.RawCertificate, error) {
+	certs := map[string]*acme.RawCertificate{}
+
+	cert, _, err := c.get(order.Certificate, bundle)
+	if err != nil {
+		return nil, err
+	}
+
+	certs[order.Certificate] = cert
+
+	cert, _, err = c.get(order.CertificateSign, bundle)
+	if err != nil {
+		return nil, err
+	}
+
+	certs[order.CertificateSign] = cert
+
+	cert, _, err = c.get(order.CertificateEncrypt, bundle)
+	if err != nil {
+		return nil, err
+	}
+
+	certs[order.CertificateEncrypt] = cert
+
+	return certs, err
+}
+
 // Revoke Revokes a certificate.
 func (c *CertificateService) Revoke(req acme.RevokeCertMessage) error {
 	_, err := c.core.post(c.core.GetDirectory().RevokeCertURL, req, nil)

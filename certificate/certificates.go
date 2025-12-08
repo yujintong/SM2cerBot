@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -215,26 +217,6 @@ func (c *Certifier) Obtain(request ObtainRequest) (*Resource, error) {
 
 // 新增方法
 func (c *Certifier) ObtainForSm2(domains []string, request api.OrderWithCsrOptions) (*acme.Order, error) {
-	// if request.CSR == nil {
-	// 	return nil, errors.New("cannot obtain resource for CSR: CSR is missing")
-	// }
-
-	// figure out what domains it concerns
-	// start with the common name
-	// domains := certcrypto.ExtractDomainsCSR(request.CSR)
-
-	// if request.Bundle {
-	// 	log.Infof("[%s] acme: Obtaining bundled SAN certificate given a CSR", strings.Join(domains, ", "))
-	// } else {
-	// 	log.Infof("[%s] acme: Obtaining SAN certificate given a CSR", strings.Join(domains, ", "))
-	// }
-
-	// orderOpts := &api.OrderWithCsrOptions{
-	// 	NotBefore:      request.NotBefore,
-	// 	NotAfter:       request.NotAfter,
-	// 	Profile:        request.Profile,
-	// 	ReplacesCertID: request.ReplacesCertID,
-	// }
 
 	order, err := c.core.Orders.NewWithCsrOption(domains, &request)
 	if err != nil {
@@ -255,32 +237,43 @@ func (c *Certifier) ObtainForSm2(domains []string, request api.OrderWithCsrOptio
 		return nil, err
 	}
 
-	log.Infof("[%s] acme: Validations succeeded; requesting certificates", strings.Join(domains, ", "))
+	// 这里干了啥
+	for _, auth := range authz {
+		fileName := "/opt/nginx" + auth.Challenge.TokenPath
+		fname := filepath.Base(fileName)
 
-	// failures := newObtainError()
+		err = os.WriteFile("/opt/nginx/"+fname, []byte(auth.Challenge.Token), 0644)
+		if err != nil {
+			fmt.Printf("Error write file: %v\n", err)
+		}
 
-	// var privateKey []byte
-	// if request.PrivateKey != nil {
-	// 	privateKey = certcrypto.PEMEncode(request.PrivateKey)
-	// }
+		// log.Infof("acme set http validation: \n[%s]\n[%s]",
+		// 	auth.Challenge.TokenPath,
+		// 	auth.Challenge.Token)
+	}
 
-	// cert, err := c.getForCSR(domains, order, request.Bundle, request.CSR.Raw, privateKey, request.PreferredChain)
-	// if err != nil {
-	// 	for _, auth := range authz {
-	// 		failures.Add(challenge.GetTargetedDomain(auth), err)
-	// 	}
-	// }
+	for {
+		time.Sleep(10 * time.Second)
+		order, err = c.core.Orders.GetOrderStatus(order.Location)
+		if err != nil {
+			fmt.Errorf("Error get order status: %v\n", err)
+		}
 
-	// if request.AlwaysDeactivateAuthorizations {
-	// 	c.deactivateAuthorizations(order, true)
-	// }
+		if order.Status == "valid" {
+			break
+		}
 
-	// if cert != nil {
-	// 	// Add the CSR to the certificate so that it can be used for renewals.
-	// 	cert.CSR = certcrypto.PEMEncode(request.CSR)
-	// }
+		fmt.Printf("order current status %s\n", order.Status)
+	}
 
-	// return cert, failures.Join()
+	certs, err := c.core.Certificates.GetAllSm2Certs(order, false)
+	if err != nil {
+		log.Logger.Fatalf("Failed : %v", err)
+	}
+
+	for k, v := range certs {
+		fmt.Printf("url:%s\n %s%s\n\n", k, string(v.Cert), string(v.Issuer))
+	}
 
 	return &order.Order, nil
 }
