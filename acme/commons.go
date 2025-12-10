@@ -131,9 +131,11 @@ type Account struct {
 // ExtendedOrder a extended Order.
 type ExtendedOrder struct {
 	Order
-
 	// The order URL, contains the value of the response header `Location`
 	Location string `json:"-"`
+
+	// 附加验证内容
+	Authz []Authorization
 }
 
 // Order the ACME order Object.

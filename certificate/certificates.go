@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -37,6 +35,17 @@ const (
 
 // maxBodySize is the maximum size of body that we will read.
 const maxBodySize = 1024 * 1024
+
+type GmCertificateInfo struct {
+	Domain         string `json:"domain"`
+	PrivateKey     string `json:"privateKey"`
+	PrivateSignKey string `json:"privateSignKey"`
+	PrivateEncKey  string `json:"privateEncKey"`
+
+	CertPem     string `json:"certPem"`
+	CertSignPem string `json:"certSignPem"`
+	CertEncPem  string `json:"certEncPem"`
+}
 
 // Resource represents a CA issued certificate.
 // PrivateKey, Certificate and IssuerCertificate are all
@@ -215,55 +224,51 @@ func (c *Certifier) Obtain(request ObtainRequest) (*Resource, error) {
 	return cert, failures.Join()
 }
 
-// 新增方法
-func (c *Certifier) ObtainForSm2(domains []string, request api.OrderWithCsrOptions) (*acme.Order, error) {
-
+// 下单
+func (c *Certifier) ObtainForSm2(domains []string, request api.OrderWithCsrOptions) (acme.ExtendedOrder, error) {
 	order, err := c.core.Orders.NewWithCsrOption(domains, &request)
 	if err != nil {
-		return nil, err
+		return order, err
 	}
 
 	authz, err := c.getAuthorizations(order)
 	if err != nil {
 		// If any challenge fails, return. Do not generate partial SAN certificates.
 		// c.deactivateAuthorizations(order, request.AlwaysDeactivateAuthorizations)
-		return nil, err
+		return order, err
 	}
 
-	err = c.resolver.Solve(authz)
-	if err != nil {
-		// If any challenge fails, return. Do not generate partial SAN certificates.
-		// c.deactivateAuthorizations(order, request.AlwaysDeactivateAuthorizations)
-		return nil, err
-	}
+	order.Authz = authz
 
-	// 这里干了啥
-	for _, auth := range authz {
-		fileName := "/opt/nginx" + auth.Challenge.TokenPath
-		fname := filepath.Base(fileName)
+	return order, nil
+}
 
-		err = os.WriteFile("/opt/nginx/"+fname, []byte(auth.Challenge.Token), 0644)
-		if err != nil {
-			fmt.Printf("Error write file: %v\n", err)
-		}
+// 取订单
+func (c *Certifier) GetSm2OrderStatus(order acme.ExtendedOrder) (map[string]*acme.RawCertificate, error) {
 
-		// log.Infof("acme set http validation: \n[%s]\n[%s]",
-		// 	auth.Challenge.TokenPath,
-		// 	auth.Challenge.Token)
-	}
-
+	icout := 180
+	status := ""
 	for {
-		time.Sleep(10 * time.Second)
-		order, err = c.core.Orders.GetOrderStatus(order.Location)
+		time.Sleep(30 * time.Second)
+		o, err := c.core.Orders.GetOrderStatus(order.Location)
 		if err != nil {
-			fmt.Errorf("Error get order status: %v\n", err)
+			log.Println("Error get order status:", err)
 		}
 
-		if order.Status == "valid" {
+		if status != o.Status {
+			log.Println("order current status:", o.Status)
+			status = o.Status
+		}
+
+		if o.Status == "valid" {
+			order.Order = o.Order
 			break
 		}
 
-		fmt.Printf("order current status %s\n", order.Status)
+		icout--
+		if icout < 0 {
+			log.Fatalf("get order status timeout")
+		}
 	}
 
 	certs, err := c.core.Certificates.GetAllSm2Certs(order, false)
@@ -271,11 +276,7 @@ func (c *Certifier) ObtainForSm2(domains []string, request api.OrderWithCsrOptio
 		log.Logger.Fatalf("Failed : %v", err)
 	}
 
-	for k, v := range certs {
-		fmt.Printf("url:%s\n %s%s\n\n", k, string(v.Cert), string(v.Issuer))
-	}
-
-	return &order.Order, nil
+	return certs, nil
 }
 
 // ObtainForCSR tries to obtain a certificate matching the CSR passed into it.

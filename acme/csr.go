@@ -125,12 +125,12 @@ func CreateCSR(keyType KeyType, keyBits int, req CertRequest) (csrBaseUrl string
 	csrPEM := csrToBase64URL(csrDER)
 
 	// 编码私钥为 PEM 格式
-	privateKeyPEM, err := encodePrivateKey(privateKey, keyType)
+	privateKeyBytes, err := encodePrivateKey(privateKey, keyType)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to encode private key: %v", err)
 	}
 
-	return csrPEM, privateKeyPEM, nil
+	return csrPEM, privateKeyBytes, nil
 }
 
 func csrToBase64URL(csrDER []byte) string {

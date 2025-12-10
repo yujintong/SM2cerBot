@@ -24,6 +24,7 @@ import (
 const (
 	baseCertificatesFolderName = "certificates"
 	baseArchivesFolderName     = "archives"
+	baseValidationFolderName   = "validation"
 )
 
 const (
@@ -49,13 +50,14 @@ const (
 //	     │      └── archived certificates directory
 //	     └── "path" option
 type CertificatesStorage struct {
-	rootPath    string
-	archivePath string
-	pem         bool
-	pfx         bool
-	pfxPassword string
-	pfxFormat   string
-	filename    string // Deprecated
+	rootPath             string
+	archivePath          string
+	pem                  bool
+	pfx                  bool
+	pfxPassword          string
+	pfxFormat            string
+	filename             string // Deprecated
+	validationFolderName string
 }
 
 // NewCertificatesStorage create a new certificates storage.
@@ -69,18 +71,24 @@ func NewCertificatesStorage(ctx *cli.Context) *CertificatesStorage {
 	}
 
 	return &CertificatesStorage{
-		rootPath:    filepath.Join(ctx.String(flgPath), baseCertificatesFolderName),
-		archivePath: filepath.Join(ctx.String(flgPath), baseArchivesFolderName),
-		pem:         ctx.Bool(flgPEM),
-		pfx:         ctx.Bool(flgPFX),
-		pfxPassword: ctx.String(flgPFXPass),
-		pfxFormat:   pfxFormat,
-		filename:    ctx.String(flgFilename),
+		rootPath:             filepath.Join(ctx.String(flgPath), baseCertificatesFolderName),
+		archivePath:          filepath.Join(ctx.String(flgPath), baseArchivesFolderName),
+		validationFolderName: filepath.Join(ctx.String(flgPath), baseValidationFolderName),
+		pem:                  ctx.Bool(flgPEM),
+		pfx:                  ctx.Bool(flgPFX),
+		pfxPassword:          ctx.String(flgPFXPass),
+		pfxFormat:            pfxFormat,
+		filename:             ctx.String(flgFilename),
 	}
 }
 
 func (s *CertificatesStorage) CreateRootFolder() {
 	err := createNonExistingFolder(s.rootPath)
+	if err != nil {
+		log.Fatalf("Could not check/create path: %v", err)
+	}
+
+	err = createNonExistingFolder(s.validationFolderName)
 	if err != nil {
 		log.Fatalf("Could not check/create path: %v", err)
 	}
@@ -134,6 +142,31 @@ func (s *CertificatesStorage) SaveResource(certRes *certificate.Resource) {
 	if err != nil {
 		log.Fatalf("Unable to save CertResource for domain %s\n\t%v", domain, err)
 	}
+}
+
+func (s *CertificatesStorage) SaveCertificate(domain string, extName string, cert []byte, key []byte) {
+
+	err := s.WriteFile(domain, extName+".crt", cert)
+	if err != nil {
+		log.Fatalf("Unable to save Certificate for domain %s\n\t%v", domain, err)
+	}
+
+	err = s.WriteFile(domain, extName+".key", key)
+	if err != nil {
+		log.Fatalf("Unable to save IssuerCertificate for domain %s\n\t%v", domain, err)
+	}
+}
+
+func (s *CertificatesStorage) SaveValidation(path string, value []byte) {
+
+	filePath := filepath.Join(s.validationFolderName, "/"+path)
+
+	err := os.WriteFile(filePath, value, filePerm)
+	if err != nil {
+		log.Fatalf("Unable to save validation file for %s\n\t%v", path, err)
+	}
+
+	log.Println("save validation:\n", filePath, "\n", string(value))
 }
 
 func (s *CertificatesStorage) ReadResource(domain string) certificate.Resource {

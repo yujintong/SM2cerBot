@@ -1,13 +1,12 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/go-acme/lego/v4/acme"
 	"github.com/go-acme/lego/v4/acme/api"
-	"github.com/go-acme/lego/v4/certificate"
 	"github.com/go-acme/lego/v4/lego"
 	"github.com/go-acme/lego/v4/log"
 	"github.com/go-acme/lego/v4/registration"
@@ -133,6 +132,14 @@ func run(ctx *cli.Context) error {
 	certsStorage := NewCertificatesStorage(ctx)
 	certsStorage.CreateRootFolder()
 
+	err := obtainCertificate(ctx, client, certsStorage)
+
+	if err != nil {
+		// Make sure to return a non-zero exit code if ObtainSANCertificate returned at least one error.
+		// Due to us not returning partial certificate we can just exit here instead of at the end.
+		log.Fatalf("Could not obtain certificates:\n\t%v", err)
+	}
+
 	// cert, err := obtainCertificate(ctx, client)
 	// if err != nil {
 	// 	// Make sure to return a non-zero exit code if ObtainSANCertificate returned at least one error.
@@ -142,23 +149,13 @@ func run(ctx *cli.Context) error {
 
 	// certsStorage.SaveResource(cert)
 
-	// meta := map[string]string{
-	// 	hookEnvAccountEmail: account.Email,
-	// }
+	meta := map[string]string{
+		hookEnvAccountEmail: account.Email,
+	}
 
 	// addPathToMetadata(meta, cert.Domain, cert, certsStorage)
 
-	// return launchHook(ctx.String(flgRunHook), ctx.Duration(flgRunHookTimeout), meta)
-
-	_, err := obtainCertificate(ctx, client)
-
-	if err != nil {
-		// Make sure to return a non-zero exit code if ObtainSANCertificate returned at least one error.
-		// Due to us not returning partial certificate we can just exit here instead of at the end.
-		log.Fatalf("Could not obtain certificates:\n\t%v", err)
-	}
-
-	return nil
+	return launchHook(ctx.String(flgRunHook), ctx.Duration(flgRunHookTimeout), meta)
 }
 
 func register(ctx *cli.Context, client *lego.Client) (*registration.Resource, error) {
@@ -240,7 +237,7 @@ func register(ctx *cli.Context, client *lego.Client) (*registration.Resource, er
 // 	return client.Certificate.ObtainForCSR(request)
 // }
 
-func obtainCertificate(ctx *cli.Context, client *lego.Client) (*certificate.Resource, error) {
+func obtainCertificate(ctx *cli.Context, client *lego.Client, certificatesStorage *CertificatesStorage) error {
 	// bundle := !ctx.Bool(flgNoBundle)
 
 	domains := ctx.StringSlice(flgDomains)
@@ -257,17 +254,17 @@ func obtainCertificate(ctx *cli.Context, client *lego.Client) (*certificate.Reso
 		CommonName: domains[0],
 	}
 
-	eccCsr, _, err := acme.CreateCSR(acme.ECC, 256, req)
+	eccCsr, ecckey, err := acme.CreateCSR(acme.ECC, 256, req)
 	if err != nil {
 		log.Fatalf("Failed to create ECC CSR: %v", err)
 	}
 
-	sm2SignCsr, _, err := acme.CreateCSR(acme.SM2, 256, req)
+	sm2SignCsr, signkey, err := acme.CreateCSR(acme.SM2, 256, req)
 	if err != nil {
 		log.Fatalf("Failed to create SM2 CSR: %v", err)
 	}
 
-	sm2EncCsr, _, err := acme.CreateCSR(acme.SM2, 256, req)
+	sm2EncCsr, enckey, err := acme.CreateCSR(acme.SM2, 256, req)
 	if err != nil {
 		log.Fatalf("Failed to create SM2 CSR: %v", err)
 	}
@@ -280,16 +277,33 @@ func obtainCertificate(ctx *cli.Context, client *lego.Client) (*certificate.Reso
 	}
 
 	order, err := client.Certificate.ObtainForSm2(domains, request)
+
+	for _, auth := range order.Authz {
+
+		fileName := filepath.Base(auth.Challenge.TokenPath)
+
+		certificatesStorage.SaveValidation(fileName, []byte(auth.Challenge.Token))
+	}
+
+	certs, err := client.Certificate.GetSm2OrderStatus(order)
+
 	if err != nil {
 		log.Logger.Fatalf("Failed to send order request: %v", err)
 	}
 
-	jsonData, err := json.Marshal(order)
-	if err != nil {
-		log.Logger.Fatalf("Failed json marshal: %v", err)
+	for k, v := range certs {
+		// fmt.Printf("url:%s\n %s%s\n\n", k, string(v.Cert), string(v.Issuer))
+		bys := append(v.Cert, v.Issuer...)
+
+		switch {
+		case k == "intcert":
+			certificatesStorage.SaveCertificate(domains[0], "_ecc", bys, ecckey)
+		case k == "sm2sign":
+			certificatesStorage.SaveCertificate(domains[0], "_sign", bys, signkey)
+		case k == "sm2enc":
+			certificatesStorage.SaveCertificate(domains[0], "_enc", bys, enckey)
+		}
 	}
 
-	fmt.Println(string(jsonData))
-
-	return nil, nil
+	return nil
 }

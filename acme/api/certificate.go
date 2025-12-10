@@ -60,21 +60,21 @@ func (c *CertificateService) GetAllSm2Certs(order acme.ExtendedOrder, bundle boo
 		return nil, err
 	}
 
-	certs[order.Certificate] = cert
+	certs["intcert"] = cert
 
 	cert, _, err = c.get(order.CertificateSign, bundle)
 	if err != nil {
 		return nil, err
 	}
 
-	certs[order.CertificateSign] = cert
+	certs["sm2sign"] = cert
 
 	cert, _, err = c.get(order.CertificateEncrypt, bundle)
 	if err != nil {
 		return nil, err
 	}
 
-	certs[order.CertificateEncrypt] = cert
+	certs["sm2enc"] = cert
 
 	return certs, err
 }
