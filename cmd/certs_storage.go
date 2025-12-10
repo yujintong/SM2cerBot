@@ -29,7 +29,7 @@ const (
 
 const (
 	issuerExt   = ".issuer.crt"
-	certExt     = "_ecc"
+	certExt     = "_ecc.crt"
 	keyExt      = ".key"
 	pemExt      = ".pem"
 	pfxExt      = ".pfx"
@@ -205,7 +205,7 @@ func (s *CertificatesStorage) GetFileName(domain, extension string) string {
 }
 
 func (s *CertificatesStorage) ReadCertificate(domain, extension string) ([]*x509.Certificate, error) {
-	content, err := s.ReadFile(domain, extension+".crt")
+	content, err := s.ReadFile(domain, extension)
 	if err != nil {
 		return nil, err
 	}
