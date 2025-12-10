@@ -225,8 +225,8 @@ func (c *Certifier) Obtain(request ObtainRequest) (*Resource, error) {
 }
 
 // 下单
-func (c *Certifier) ObtainForSm2(domains []string, request api.OrderWithCsrOptions) (acme.ExtendedOrder, error) {
-	order, err := c.core.Orders.NewWithCsrOption(domains, &request)
+func (c *Certifier) ObtainForSm2(domain string, request api.OrderWithCsrOptions) (acme.ExtendedOrder, error) {
+	order, err := c.core.Orders.NewWithCsrOption(domain, &request)
 	if err != nil {
 		return order, err
 	}
@@ -240,11 +240,13 @@ func (c *Certifier) ObtainForSm2(domains []string, request api.OrderWithCsrOptio
 
 	order.Authz = authz
 
+	log.Println(domain, "post order success")
+
 	return order, nil
 }
 
 // 取订单
-func (c *Certifier) GetSm2OrderStatus(order acme.ExtendedOrder) (map[string]*acme.RawCertificate, error) {
+func (c *Certifier) GetSm2OrderStatus(domain string, order acme.ExtendedOrder) (map[string]*acme.RawCertificate, error) {
 
 	icout := 180
 	status := ""
@@ -252,11 +254,11 @@ func (c *Certifier) GetSm2OrderStatus(order acme.ExtendedOrder) (map[string]*acm
 		time.Sleep(30 * time.Second)
 		o, err := c.core.Orders.GetOrderStatus(order.Location)
 		if err != nil {
-			log.Println("Error get order status:", err)
+			log.Println(domain, "Error get order status:", err)
 		}
 
 		if status != o.Status {
-			log.Println("order current status:", o.Status)
+			log.Println(domain, "order status:", o.Status)
 			status = o.Status
 		}
 
@@ -267,7 +269,7 @@ func (c *Certifier) GetSm2OrderStatus(order acme.ExtendedOrder) (map[string]*acm
 
 		icout--
 		if icout < 0 {
-			log.Fatalf("get order status timeout")
+			log.Fatalf(domain, "get order status timeout")
 		}
 	}
 

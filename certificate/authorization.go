@@ -39,9 +39,9 @@ func (c *Certifier) getAuthorizations(order acme.ExtendedOrder) ([]acme.Authoriz
 		}
 	}
 
-	for i, auth := range order.Authorizations {
-		log.Infof("[%s] AuthURL: %s", order.Identifiers[i].Value, auth)
-	}
+	// for i, auth := range order.Authorizations {
+	// 	log.Infof("[%s] AuthURL: %s", order.Identifiers[i].Value, auth)
+	// }
 
 	close(resc)
 	close(errc)

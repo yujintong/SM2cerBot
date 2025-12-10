@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/go-acme/lego/v4/acme"
@@ -158,7 +159,23 @@ func renew(ctx *cli.Context) error {
 
 func renewForDomains(ctx *cli.Context, account *Account, keyType certcrypto.KeyType, certsStorage *CertificatesStorage, bundle bool, meta map[string]string) error {
 	domains := ctx.StringSlice(flgDomains)
-	domain := domains[0]
+	// domain := domains[0]
+	client := setupClient(ctx, account, keyType)
+
+	var wg sync.WaitGroup
+	for _, domain := range domains {
+		wg.Add(1)
+		go renewDomainCheck(ctx, domain, client, certsStorage, &wg)
+	}
+
+	wg.Wait()
+
+	return launchHook(ctx.String(flgRenewHook), ctx.Duration(flgRenewHookTimeout), meta)
+}
+
+func renewDomainCheck(ctx *cli.Context, domain string, client *lego.Client, certsStorage *CertificatesStorage, wg *sync.WaitGroup) {
+
+	defer wg.Done()
 
 	// load the cert resource from files.
 	// We store the certificate, private key and metadata in different files
@@ -175,11 +192,7 @@ func renewForDomains(ctx *cli.Context, account *Account, keyType certcrypto.KeyT
 		// replacesCertID string
 	)
 
-	var client *lego.Client
-
 	if !ctx.Bool(flgARIDisable) {
-		client = setupClient(ctx, account, keyType)
-
 		ariRenewalTime = getARIRenewalTime(ctx, cert, domain, client)
 		if ariRenewalTime != nil {
 			now := time.Now().UTC()
@@ -190,24 +203,10 @@ func renewForDomains(ctx *cli.Context, account *Account, keyType certcrypto.KeyT
 				time.Sleep(ariRenewalTime.Sub(now))
 			}
 		}
-
-		// replacesCertID, err = certificate.MakeARICertID(cert)
-		// if err != nil {
-		// 	log.Fatalf("Error while construction the ARI CertID for domain %s\n\t%v", domain, err)
-		// }
 	}
 
-	forceDomains := ctx.Bool(flgForceCertDomains)
-
-	certDomains := certcrypto.ExtractDomains(cert)
-
-	if ariRenewalTime == nil && !needRenewal(cert, domain, ctx.Int(flgRenewDays), ctx.Bool(flgRenewDynamic)) &&
-		(!forceDomains || slices.Equal(certDomains, domains)) {
-		return nil
-	}
-
-	if client == nil {
-		client = setupClient(ctx, account, keyType)
+	if ariRenewalTime == nil && !needRenewal(cert, domain, ctx.Int(flgRenewDays), ctx.Bool(flgRenewDynamic)) {
+		return
 	}
 
 	// This is just meant to be informal for the user.
@@ -224,17 +223,14 @@ func renewForDomains(ctx *cli.Context, account *Account, keyType certcrypto.KeyT
 		sleepTime := time.Duration(rnd.Int63n(int64(jitter)))
 
 		log.Infof("renewal: random delay of %s", sleepTime)
-		// time.Sleep(sleepTime)
 	}
 
-	err = renewCertificate(ctx, client, certsStorage)
+	err = renewCertificate(domain, client, certsStorage)
 	if err != nil {
 		// Make sure to return a non-zero exit code if ObtainSANCertificate returned at least one error.
 		// Due to us not returning partial certificate we can just exit here instead of at the end.
-		log.Fatalf("Could not obtain certificates:\n\t%v", err)
+		log.Println("Could not obtain certificates:\n\t%v", err)
 	}
-
-	return launchHook(ctx.String(flgRenewHook), ctx.Duration(flgRenewHookTimeout), meta)
 }
 
 func needRenewal(x509Cert *x509.Certificate, domain string, days int, dynamic bool) bool {
@@ -329,21 +325,18 @@ func merge(prevDomains, nextDomains []string) []string {
 	return prevDomains
 }
 
-func renewCertificate(ctx *cli.Context, client *lego.Client, certificatesStorage *CertificatesStorage) error {
-	// bundle := !ctx.Bool(flgNoBundle)
-
-	domains := ctx.StringSlice(flgDomains)
+func renewCertificate(domain string, client *lego.Client, certificatesStorage *CertificatesStorage) error {
 
 	var identifiers = []acme.Identifier{
 		{
 			Type:          "dns",
-			Value:         domains[0],
+			Value:         domain,
 			ChallengeType: "http-01",
 		},
 	}
 
 	req := acme.CertRequest{
-		CommonName: domains[0],
+		CommonName: domain,
 	}
 
 	eccCsr, ecckey, err := acme.CreateCSR(acme.ECC, 256, req)
@@ -368,16 +361,18 @@ func renewCertificate(ctx *cli.Context, client *lego.Client, certificatesStorage
 		Identifiers: identifiers,
 	}
 
-	order, err := client.Certificate.ObtainForSm2(domains, request)
+	order, err := client.Certificate.ObtainForSm2(domain, request)
+	if err != nil {
+		log.Logger.Fatalf("Failed to send order request: %v", err)
+		return err
+	}
 
 	for _, auth := range order.Authz {
-
 		fileName := filepath.Base(auth.Challenge.TokenPath)
-
 		certificatesStorage.SaveValidation(fileName, []byte(auth.Challenge.Token))
 	}
 
-	certs, err := client.Certificate.GetSm2OrderStatus(order)
+	certs, err := client.Certificate.GetSm2OrderStatus(domain, order)
 
 	if err != nil {
 		log.Logger.Fatalf("Failed to send order request: %v", err)
@@ -389,11 +384,11 @@ func renewCertificate(ctx *cli.Context, client *lego.Client, certificatesStorage
 
 		switch {
 		case k == "intcert":
-			certificatesStorage.SaveCertificate(domains[0], "_ecc", bys, ecckey)
+			certificatesStorage.SaveCertificate(domain, "_ecc", bys, ecckey)
 		case k == "sm2sign":
-			certificatesStorage.SaveCertificate(domains[0], "_sign", bys, signkey)
+			certificatesStorage.SaveCertificate(domain, "_sign", bys, signkey)
 		case k == "sm2enc":
-			certificatesStorage.SaveCertificate(domains[0], "_enc", bys, enckey)
+			certificatesStorage.SaveCertificate(domain, "_enc", bys, enckey)
 		}
 	}
 

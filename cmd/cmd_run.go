@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/go-acme/lego/v4/acme"
@@ -132,28 +133,11 @@ func run(ctx *cli.Context) error {
 	certsStorage := NewCertificatesStorage(ctx)
 	certsStorage.CreateRootFolder()
 
-	err := obtainCertificate(ctx, client, certsStorage)
-
-	if err != nil {
-		// Make sure to return a non-zero exit code if ObtainSANCertificate returned at least one error.
-		// Due to us not returning partial certificate we can just exit here instead of at the end.
-		log.Fatalf("Could not obtain certificates:\n\t%v", err)
-	}
-
-	// cert, err := obtainCertificate(ctx, client)
-	// if err != nil {
-	// 	// Make sure to return a non-zero exit code if ObtainSANCertificate returned at least one error.
-	// 	// Due to us not returning partial certificate we can just exit here instead of at the end.
-	// 	log.Fatalf("Could not obtain certificates:\n\t%v", err)
-	// }
-
-	// certsStorage.SaveResource(cert)
+	obtainCertificate(ctx, client, certsStorage)
 
 	meta := map[string]string{
 		hookEnvAccountEmail: account.Email,
 	}
-
-	// addPathToMetadata(meta, cert.Domain, cert, certsStorage)
 
 	return launchHook(ctx.String(flgRunHook), ctx.Duration(flgRunHookTimeout), meta)
 }
@@ -179,79 +163,36 @@ func register(ctx *cli.Context, client *lego.Client) (*registration.Resource, er
 	return client.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
 }
 
-// func obtainCertificate(ctx *cli.Context, client *lego.Client) (*certificate.Resource, error) {
-// 	bundle := !ctx.Bool(flgNoBundle)
-
-// 	domains := ctx.StringSlice(flgDomains)
-// 	if len(domains) > 0 {
-// 		// obtain a certificate, generating a new private key
-// 		request := certificate.ObtainRequest{
-// 			Domains:                        domains,
-// 			MustStaple:                     ctx.Bool(flgMustStaple),
-// 			NotBefore:                      getTime(ctx, flgNotBefore),
-// 			NotAfter:                       getTime(ctx, flgNotAfter),
-// 			Bundle:                         bundle,
-// 			PreferredChain:                 ctx.String(flgPreferredChain),
-// 			Profile:                        ctx.String(flgProfile),
-// 			AlwaysDeactivateAuthorizations: ctx.Bool(flgAlwaysDeactivateAuthorizations),
-// 		}
-
-// 		if ctx.IsSet(flgPrivateKey) {
-// 			var err error
-
-// 			request.PrivateKey, err = loadPrivateKey(ctx.String(flgPrivateKey))
-// 			if err != nil {
-// 				return nil, fmt.Errorf("load private key: %w", err)
-// 			}
-// 		}
-
-// 		return client.Certificate.Obtain(request)
-// 	}
-
-// 	// read the CSR
-// 	csr, err := readCSRFile(ctx.String(flgCSR))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	// obtain a certificate for this CSR
-// 	request := certificate.ObtainForCSRRequest{
-// 		CSR:                            csr,
-// 		NotBefore:                      getTime(ctx, flgNotBefore),
-// 		NotAfter:                       getTime(ctx, flgNotAfter),
-// 		Bundle:                         bundle,
-// 		PreferredChain:                 ctx.String(flgPreferredChain),
-// 		Profile:                        ctx.String(flgProfile),
-// 		AlwaysDeactivateAuthorizations: ctx.Bool(flgAlwaysDeactivateAuthorizations),
-// 	}
-
-// 	if ctx.IsSet(flgPrivateKey) {
-// 		var err error
-
-// 		request.PrivateKey, err = loadPrivateKey(ctx.String(flgPrivateKey))
-// 		if err != nil {
-// 			return nil, fmt.Errorf("load private key: %w", err)
-// 		}
-// 	}
-
-// 	return client.Certificate.ObtainForCSR(request)
-// }
-
 func obtainCertificate(ctx *cli.Context, client *lego.Client, certificatesStorage *CertificatesStorage) error {
-	// bundle := !ctx.Bool(flgNoBundle)
+
+	var wg sync.WaitGroup
 
 	domains := ctx.StringSlice(flgDomains)
+
+	for _, domain := range domains {
+		wg.Add(1)
+		go obtainDomainCertificate(domain, client, certificatesStorage, &wg)
+	}
+
+	wg.Wait()
+
+	return nil
+}
+
+func obtainDomainCertificate(domain string, client *lego.Client, certificatesStorage *CertificatesStorage, wg *sync.WaitGroup) error {
+
+	defer wg.Done()
 
 	var identifiers = []acme.Identifier{
 		{
 			Type:          "dns",
-			Value:         domains[0],
+			Value:         domain,
 			ChallengeType: "http-01",
 		},
 	}
 
 	req := acme.CertRequest{
-		CommonName: domains[0],
+		CommonName: domain,
 	}
 
 	eccCsr, ecckey, err := acme.CreateCSR(acme.ECC, 256, req)
@@ -276,19 +217,22 @@ func obtainCertificate(ctx *cli.Context, client *lego.Client, certificatesStorag
 		Identifiers: identifiers,
 	}
 
-	order, err := client.Certificate.ObtainForSm2(domains, request)
+	order, err := client.Certificate.ObtainForSm2(domain, request)
+
+	if err != nil {
+		log.Logger.Fatalf("Failed to send order request: %v", err)
+		return err
+	}
 
 	for _, auth := range order.Authz {
 
 		fileName := filepath.Base(auth.Challenge.TokenPath)
-
 		certificatesStorage.SaveValidation(fileName, []byte(auth.Challenge.Token))
 	}
 
-	certs, err := client.Certificate.GetSm2OrderStatus(order)
-
+	certs, err := client.Certificate.GetSm2OrderStatus(domain, order)
 	if err != nil {
-		log.Logger.Fatalf("Failed to send order request: %v", err)
+		log.Logger.Fatalf("Failed to get order status request: %v", err)
 	}
 
 	for k, v := range certs {
@@ -297,11 +241,11 @@ func obtainCertificate(ctx *cli.Context, client *lego.Client, certificatesStorag
 
 		switch {
 		case k == "intcert":
-			certificatesStorage.SaveCertificate(domains[0], "_ecc", bys, ecckey)
+			certificatesStorage.SaveCertificate(domain, "_ecc", bys, ecckey)
 		case k == "sm2sign":
-			certificatesStorage.SaveCertificate(domains[0], "_sign", bys, signkey)
+			certificatesStorage.SaveCertificate(domain, "_sign", bys, signkey)
 		case k == "sm2enc":
-			certificatesStorage.SaveCertificate(domains[0], "_enc", bys, enckey)
+			certificatesStorage.SaveCertificate(domain, "_enc", bys, enckey)
 		}
 	}
 
