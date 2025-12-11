@@ -164,14 +164,13 @@ func register(ctx *cli.Context, client *lego.Client) (*registration.Resource, er
 }
 
 func obtainCertificate(ctx *cli.Context, client *lego.Client, certificatesStorage *CertificatesStorage) error {
-
 	var wg sync.WaitGroup
 
 	domains := ctx.StringSlice(flgDomains)
 
 	for _, domain := range domains {
 		wg.Add(1)
-		go obtainDomainCertificate(domain, client, certificatesStorage, &wg)
+		go obtainDomainCertificate(domain, ctx, client, certificatesStorage, &wg)
 	}
 
 	wg.Wait()
@@ -179,15 +178,27 @@ func obtainCertificate(ctx *cli.Context, client *lego.Client, certificatesStorag
 	return nil
 }
 
-func obtainDomainCertificate(domain string, client *lego.Client, certificatesStorage *CertificatesStorage, wg *sync.WaitGroup) error {
+func obtainDomainCertificate(domain string, ctx *cli.Context, client *lego.Client, certificatesStorage *CertificatesStorage, wg *sync.WaitGroup) error {
 
 	defer wg.Done()
+
+	var challengeType string
+	if ctx.Bool(flgHTTP) {
+		challengeType = "http-01"
+	}
+	if ctx.Bool(flgTLS) {
+		challengeType = "dns-01"
+	}
+
+	if ctx.IsSet(flgDNS) {
+		challengeType = "tls-sni-01"
+	}
 
 	var identifiers = []acme.Identifier{
 		{
 			Type:          "dns",
 			Value:         domain,
-			ChallengeType: "http-01",
+			ChallengeType: challengeType,
 		},
 	}
 

@@ -60,7 +60,7 @@ func createRenew() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.IntFlag{
 				Name:  flgRenewDays,
-				Value: 30,
+				Value: 15,
 				Usage: "The number of days left on a certificate to renew it.",
 			},
 			// TODO(ldez): in v5, remove this flag, use this behavior as default.

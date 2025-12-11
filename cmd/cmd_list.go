@@ -80,6 +80,10 @@ func listCertificates(ctx *cli.Context) error {
 			continue
 		}
 
+		if !strings.HasSuffix(filename, certExt) {
+			continue
+		}
+
 		data, err := os.ReadFile(filename)
 		if err != nil {
 			return err
