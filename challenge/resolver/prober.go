@@ -60,11 +60,12 @@ func (p *Prober) Solve(authorizations []acme.Authorization) error {
 
 	for _, authz := range authorizations {
 		domain := challenge.GetTargetedDomain(authz)
-		if authz.Status == acme.StatusValid {
-			// Boulder might recycle recent validated authz (see issue #267)
-			log.Infof("[%s] acme: authorization already valid; skipping challenge", domain)
-			continue
-		}
+
+		// if authz.Status == acme.StatusValid {
+		// 	// Boulder might recycle recent validated authz (see issue #267)
+		// 	log.Infof("[%s] acme: authorization already valid; skipping challenge", domain)
+		// 	continue
+		// }
 
 		if solvr := p.solverManager.chooseSolver(authz); solvr != nil {
 			authSolver := &selectedAuthSolver{authz: authz, solver: solvr}

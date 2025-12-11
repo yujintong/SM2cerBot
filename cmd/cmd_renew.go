@@ -372,6 +372,13 @@ func renewCertificate(domain string, client *lego.Client, certificatesStorage *C
 		certificatesStorage.SaveValidation(fileName, []byte(auth.Challenge.Token))
 	}
 
+	defer func() {
+		for _, auth := range order.Authz {
+			fileName := filepath.Base(auth.Challenge.TokenPath)
+			certificatesStorage.ClearValidation(fileName)
+		}
+	}()
+
 	certs, err := client.Certificate.GetSm2OrderStatus(domain, order)
 
 	if err != nil {

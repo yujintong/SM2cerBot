@@ -65,14 +65,14 @@ func (c *SolverManager) chooseSolver(authz acme.Authorization) solver {
 
 	// sort.Sort(byType(authz.Challenges))
 
-	// domain := challenge.GetTargetedDomain(authz)
-	// for _, chlg := range authz.Challenges {
-	// 	if solvr, ok := c.solvers[challenge.Type(chlg.Type)]; ok {
-	// 		log.Infof("[%s] acme: use %s solver", domain, chlg.Type)
-	// 		return solvr
-	// 	}
+	domain := challenge.GetTargetedDomain(authz)
+	// for _, chlg := range authz.Challenge {
+	if solvr, ok := c.solvers[challenge.Type(authz.Challenge.Type)]; ok {
+		log.Infof("[%s] acme: use %s solver", domain, authz.Challenge.Type)
+		return solvr
+	}
 
-	// 	log.Infof("[%s] acme: Could not find solver for: %s", domain, chlg.Type)
+	log.Infof("[%s] acme: Could not find solver for: %s", domain, authz.Challenge.Type)
 	// }
 
 	return nil

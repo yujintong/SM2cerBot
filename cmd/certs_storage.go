@@ -165,8 +165,13 @@ func (s *CertificatesStorage) SaveValidation(path string, value []byte) {
 	if err != nil {
 		log.Fatalf("Unable to save validation file for %s\n\t%v", path, err)
 	}
+}
 
-	// log.Println("save validation:\n", filePath, "\n", string(value))
+func (s *CertificatesStorage) ClearValidation(path string) {
+	filePath := filepath.Join(s.validationFolderName, "/"+path)
+
+	os.Remove(filePath)
+
 }
 
 func (s *CertificatesStorage) ReadResource(domain string) certificate.Resource {

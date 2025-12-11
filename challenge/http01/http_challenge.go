@@ -64,13 +64,9 @@ func (c *Challenge) Solve(authz acme.Authorization) error {
 		return err
 	}
 
-	// Generate the Key Authorization for the challenge
-	keyAuth, err := c.core.GetKeyAuthorization(chlng.Token)
-	if err != nil {
-		return err
-	}
+	keyAuth := chlng.Token
 
-	err = c.provider.Present(authz.Identifier.Value, chlng.Token, keyAuth)
+	err = c.provider.Present(authz.Identifier.Value, chlng.TokenPath, keyAuth)
 	if err != nil {
 		return fmt.Errorf("[%s] acme: error presenting token: %w", domain, err)
 	}

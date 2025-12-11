@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/go-acme/lego/v4/challenge/http01"
 )
 
 // HTTPProvider implements ChallengeProvider for `http-01` challenge.
@@ -28,7 +26,7 @@ func NewHTTPProvider(path string) (*HTTPProvider, error) {
 func (w *HTTPProvider) Present(domain, token, keyAuth string) error {
 	var err error
 
-	challengeFilePath := filepath.Join(w.path, http01.ChallengePath(token))
+	challengeFilePath := filepath.Join(w.path, token)
 
 	err = os.MkdirAll(filepath.Dir(challengeFilePath), 0o755)
 	if err != nil {
@@ -45,7 +43,7 @@ func (w *HTTPProvider) Present(domain, token, keyAuth string) error {
 
 // CleanUp removes the file created for the challenge.
 func (w *HTTPProvider) CleanUp(domain, token, keyAuth string) error {
-	err := os.Remove(filepath.Join(w.path, http01.ChallengePath(token)))
+	err := os.Remove(filepath.Join(w.path, token))
 	if err != nil {
 		return fmt.Errorf("could not remove file in webroot after HTTP challenge: %w", err)
 	}
