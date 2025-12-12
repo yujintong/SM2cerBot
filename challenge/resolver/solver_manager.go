@@ -1,13 +1,10 @@
 package resolver
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
-	"github.com/cenkalti/backoff/v5"
 	"github.com/go-acme/lego/v4/acme"
 	"github.com/go-acme/lego/v4/acme/api"
 	"github.com/go-acme/lego/v4/challenge"
@@ -15,7 +12,6 @@ import (
 	"github.com/go-acme/lego/v4/challenge/http01"
 	"github.com/go-acme/lego/v4/challenge/tlsalpn01"
 	"github.com/go-acme/lego/v4/log"
-	"github.com/go-acme/lego/v4/platform/wait"
 )
 
 type byType []acme.Challenge
@@ -79,62 +75,89 @@ func (c *SolverManager) chooseSolver(authz acme.Authorization) solver {
 }
 
 func validate(core *api.Core, domain string, chlg acme.Challenge) error {
-	chlng, err := core.Challenges.New(chlg.URL)
-	if err != nil {
-		return fmt.Errorf("failed to initiate challenge: %w", err)
-	}
 
-	valid, err := checkChallengeStatus(chlng)
-	if err != nil {
-		return err
-	}
-
-	if valid {
-		log.Infof("[%s] The server validated our request", domain)
-		return nil
-	}
-
-	ra, err := strconv.Atoi(chlng.RetryAfter)
-	if err != nil {
-		// The ACME server MUST return a Retry-After.
-		// If it doesn't, we'll just poll hard.
-		// Boulder does not implement the ability to retry challenges or the Retry-After header.
-		// https://github.com/letsencrypt/boulder/blob/master/docs/acme-divergences.md#section-82
-		ra = 5
-	}
-
-	initialInterval := time.Duration(ra) * time.Second
-
-	ctx := context.Background()
-
-	bo := backoff.NewExponentialBackOff()
-	bo.InitialInterval = initialInterval
-	bo.MaxInterval = 10 * initialInterval
-
-	// After the path is sent, the ACME server will access our server.
-	// Repeatedly check the server for an updated status on our request.
-	operation := func() error {
-		authz, err := core.Authorizations.Get(chlng.AuthorizationURL)
+	icout := 180
+	status := ""
+	for {
+		time.Sleep(30 * time.Second)
+		o, err := core.Orders.GetOrderStatus(chlg.URL)
 		if err != nil {
-			return backoff.Permanent(err)
+			log.Warnf("[%s] acme: get order status %s", domain, err)
 		}
 
-		valid, err := checkAuthorizationStatus(authz)
-		if err != nil {
-			return backoff.Permanent(err)
+		if status != o.Status {
+			log.Infof("[%s] acme: get order status %s", domain, o.Status)
+			status = o.Status
 		}
 
-		if valid {
-			log.Infof("[%s] The server validated our request", domain)
-			return nil
+		if o.Status == "valid" {
+			break
 		}
 
-		return fmt.Errorf("the server didn't respond to our request (status=%s)", authz.Status)
+		icout--
+		if icout < 0 {
+			log.Fatalf("[%s] acme: get order status timeout", domain)
+		}
 	}
 
-	return wait.Retry(ctx, operation,
-		backoff.WithBackOff(bo),
-		backoff.WithMaxElapsedTime(100*initialInterval))
+	return nil
+
+	// chlng, err := core.Challenges.New(chlg.URL)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to initiate challenge: %w", err)
+	// }
+
+	// valid, err := checkChallengeStatus(chlng)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// if valid {
+	// 	log.Infof("[%s] The server validated our request", domain)
+	// 	return nil
+	// }
+
+	// ra, err := strconv.Atoi(chlng.RetryAfter)
+	// if err != nil {
+	// 	// The ACME server MUST return a Retry-After.
+	// 	// If it doesn't, we'll just poll hard.
+	// 	// Boulder does not implement the ability to retry challenges or the Retry-After header.
+	// 	// https://github.com/letsencrypt/boulder/blob/master/docs/acme-divergences.md#section-82
+	// 	ra = 5
+	// }
+
+	// initialInterval := time.Duration(ra) * time.Second
+
+	// ctx := context.Background()
+
+	// bo := backoff.NewExponentialBackOff()
+	// bo.InitialInterval = initialInterval
+	// bo.MaxInterval = 10 * initialInterval
+
+	// // After the path is sent, the ACME server will access our server.
+	// // Repeatedly check the server for an updated status on our request.
+	// operation := func() error {
+	// 	authz, err := core.Authorizations.Get(chlng.AuthorizationURL)
+	// 	if err != nil {
+	// 		return backoff.Permanent(err)
+	// 	}
+
+	// 	valid, err := checkAuthorizationStatus(authz)
+	// 	if err != nil {
+	// 		return backoff.Permanent(err)
+	// 	}
+
+	// 	if valid {
+	// 		log.Infof("[%s] The server validated our request", domain)
+	// 		return nil
+	// 	}
+
+	// 	return fmt.Errorf("the server didn't respond to our request (status=%s)", authz.Status)
+	// }
+
+	// return wait.Retry(ctx, operation,
+	// 	backoff.WithBackOff(bo),
+	// 	backoff.WithMaxElapsedTime(100*initialInterval))
 }
 
 func checkChallengeStatus(chlng acme.ExtendedChallenge) (bool, error) {

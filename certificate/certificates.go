@@ -231,6 +231,8 @@ func (c *Certifier) ObtainForSm2(domain string, request api.OrderWithCsrOptions)
 		return order, err
 	}
 
+	log.Println(domain, "post order success")
+
 	authz, err := c.getAuthorizations(order)
 	if err != nil {
 		// If any challenge fails, return. Do not generate partial SAN certificates.
@@ -240,7 +242,14 @@ func (c *Certifier) ObtainForSm2(domain string, request api.OrderWithCsrOptions)
 
 	order.Authz = authz
 
-	log.Println(domain, "post order success")
+	err = c.resolver.Solve(authz)
+	if err != nil {
+		// If any challenge fails, return. Do not generate partial SAN certificates.
+		// c.deactivateAuthorizations(order, request.AlwaysDeactivateAuthorizations)
+		return order, err
+	}
+
+	log.Infof("[%s] acme: Validations succeeded; requesting certificates", domain)
 
 	return order, nil
 }
@@ -248,10 +257,12 @@ func (c *Certifier) ObtainForSm2(domain string, request api.OrderWithCsrOptions)
 // 取订单
 func (c *Certifier) GetSm2OrderStatus(domain string, order acme.ExtendedOrder) (map[string]*acme.RawCertificate, error) {
 
-	icout := 180
+	icout := 10
 	status := ""
+	sleeptime := 1 * time.Second
 	for {
-		time.Sleep(30 * time.Second)
+		time.Sleep(sleeptime)
+
 		o, err := c.core.Orders.GetOrderStatus(order.Location)
 		if err != nil {
 			log.Println(domain, "Error get order status:", err)
@@ -269,8 +280,10 @@ func (c *Certifier) GetSm2OrderStatus(domain string, order acme.ExtendedOrder) (
 
 		icout--
 		if icout < 0 {
-			log.Fatalf(domain, "get order status timeout")
+			log.Fatalf("[%s] acme: get order status timeout", domain)
 		}
+
+		sleeptime = 30 * time.Second
 	}
 
 	certs, err := c.core.Certificates.GetAllSm2Certs(order, false)

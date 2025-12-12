@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
+	"net"
 	"sync"
 	"time"
 
@@ -194,9 +194,15 @@ func obtainDomainCertificate(domain string, ctx *cli.Context, client *lego.Clien
 		challengeType = "tls-sni-01"
 	}
 
+	domaintype := "ip"
+	ip := net.ParseIP(domain)
+	if ip == nil {
+		domaintype = "dns"
+	}
+
 	var identifiers = []acme.Identifier{
 		{
-			Type:          "dns",
+			Type:          domaintype,
 			Value:         domain,
 			ChallengeType: challengeType,
 		},
@@ -234,22 +240,6 @@ func obtainDomainCertificate(domain string, ctx *cli.Context, client *lego.Clien
 		log.Logger.Fatalf("Failed to send order request: %v", err)
 		return err
 	}
-
-	for _, auth := range order.Authz {
-		fileName := filepath.Base(auth.Challenge.TokenPath)
-		certificatesStorage.SaveValidation(fileName, []byte(auth.Challenge.Token))
-
-		log.Println("set valid file", fileName, "\n")
-	}
-
-	defer func() {
-		for _, auth := range order.Authz {
-			fileName := filepath.Base(auth.Challenge.TokenPath)
-			certificatesStorage.ClearValidation(fileName)
-
-			log.Println("delete valid file", fileName, "\n")
-		}
-	}()
 
 	certs, err := client.Certificate.GetSm2OrderStatus(domain, order)
 	if err != nil {

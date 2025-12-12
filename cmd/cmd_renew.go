@@ -4,8 +4,8 @@ import (
 	"crypto/x509"
 	"errors"
 	"math/rand"
+	"net"
 	"os"
-	"path/filepath"
 	"slices"
 	"sync"
 	"time"
@@ -225,7 +225,7 @@ func renewDomainCheck(ctx *cli.Context, domain string, client *lego.Client, cert
 		log.Infof("renewal: random delay of %s", sleepTime)
 	}
 
-	err = renewCertificate(domain, client, certsStorage)
+	err = renewCertificate(domain, ctx, client, certsStorage)
 	if err != nil {
 		// Make sure to return a non-zero exit code if ObtainSANCertificate returned at least one error.
 		// Due to us not returning partial certificate we can just exit here instead of at the end.
@@ -325,13 +325,31 @@ func merge(prevDomains, nextDomains []string) []string {
 	return prevDomains
 }
 
-func renewCertificate(domain string, client *lego.Client, certificatesStorage *CertificatesStorage) error {
+func renewCertificate(domain string, ctx *cli.Context, client *lego.Client, certificatesStorage *CertificatesStorage) error {
+
+	var challengeType string
+	if ctx.Bool(flgHTTP) {
+		challengeType = "http-01"
+	}
+	if ctx.Bool(flgTLS) {
+		challengeType = "dns-01"
+	}
+
+	if ctx.IsSet(flgDNS) {
+		challengeType = "tls-sni-01"
+	}
+
+	domaintype := "ip"
+	ip := net.ParseIP(domain)
+	if ip == nil {
+		domaintype = "dns"
+	}
 
 	var identifiers = []acme.Identifier{
 		{
-			Type:          "dns",
+			Type:          domaintype,
 			Value:         domain,
-			ChallengeType: "http-01",
+			ChallengeType: challengeType,
 		},
 	}
 
@@ -366,18 +384,6 @@ func renewCertificate(domain string, client *lego.Client, certificatesStorage *C
 		log.Logger.Fatalf("Failed to send order request: %v", err)
 		return err
 	}
-
-	for _, auth := range order.Authz {
-		fileName := filepath.Base(auth.Challenge.TokenPath)
-		certificatesStorage.SaveValidation(fileName, []byte(auth.Challenge.Token))
-	}
-
-	defer func() {
-		for _, auth := range order.Authz {
-			fileName := filepath.Base(auth.Challenge.TokenPath)
-			certificatesStorage.ClearValidation(fileName)
-		}
-	}()
 
 	certs, err := client.Certificate.GetSm2OrderStatus(domain, order)
 

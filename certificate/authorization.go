@@ -33,6 +33,7 @@ func (c *Certifier) getAuthorizations(order acme.ExtendedOrder) ([]acme.Authoriz
 	for range len(order.Authorizations) {
 		select {
 		case res := <-resc:
+			res.Challenge.URL = order.Location
 			responses = append(responses, res)
 		case err := <-errc:
 			failures.Add(err.Domain, err.Error)
