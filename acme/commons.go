@@ -241,7 +241,7 @@ type Authorization struct {
 	// Each array entry is an object with parameters required to validate the challenge.
 	// A client should attempt to fulfill one of these challenges,
 	// and a server should consider any one of the challenges sufficient to make the authorization valid.
-	Challenge Challenge `json:"challenge"`
+	Challenges []Challenge `json:"challenges"`
 
 	// wildcard (optional, boolean):
 	// For authorizations created as a result of a newOrder request containing a DNS identifier

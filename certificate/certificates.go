@@ -231,7 +231,7 @@ func (c *Certifier) ObtainForSm2(domain string, request api.OrderWithCsrOptions)
 		return order, err
 	}
 
-	log.Println(domain, "post order success")
+	log.Infof("[%s] post order success", domain)
 
 	authz, err := c.getAuthorizations(order)
 	if err != nil {
@@ -265,11 +265,11 @@ func (c *Certifier) GetSm2OrderStatus(domain string, order acme.ExtendedOrder) (
 
 		o, err := c.core.Orders.GetOrderStatus(order.Location)
 		if err != nil {
-			log.Println(domain, "Error get order status:", err)
+			log.Infof("[%s] Error get order status:[%s]", domain, err)
 		}
 
 		if status != o.Status {
-			log.Println(domain, "order status:", o.Status)
+			log.Infof("[%s] order status: [%s]", domain, o.Status)
 			status = o.Status
 		}
 
