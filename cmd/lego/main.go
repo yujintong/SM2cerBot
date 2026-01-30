@@ -15,8 +15,8 @@ import (
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "lego"
-	app.HelpName = "lego"
+	app.Name = "SM2cerBot"
+	app.HelpName = "SM2cerBot"
 	app.Usage = "Let's Encrypt client written in Go"
 	app.EnableBashCompletion = true
 

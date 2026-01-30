@@ -3,10 +3,10 @@
 export GO111MODULE=on
 export CGO_ENABLED=0
 
-LEGO_IMAGE := goacme/lego
+LEGO_IMAGE := goacme/SM2cerBot
 MAIN_DIRECTORY := ./cmd/lego/
 
-BIN_OUTPUT := $(if $(filter $(shell go env GOOS), windows), dist/lego.exe, dist/lego)
+BIN_OUTPUT := $(if $(filter $(shell go env GOOS), windows), dist/SM2cerBot.exe, dist/SM2cerBot)
 
 TAG_NAME := $(shell git tag -l --contains HEAD)
 SHA := $(shell git rev-parse HEAD)

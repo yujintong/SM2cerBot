@@ -132,83 +132,21 @@ func CreateFlags(defaultPath string) []cli.Flag {
 			Name:  flgHTTP,
 			Usage: "Use the HTTP-01 challenge to solve challenges. Can be mixed with other types of challenges.",
 		},
-		// &cli.StringFlag{
-		// 	Name:  flgHTTPPort,
-		// 	Usage: "Set the port and interface to use for HTTP-01 based challenges to listen on. Supported: interface:port or :port.",
-		// 	Value: ":80",
-		// },
 		&cli.DurationFlag{
 			Name:  flgHTTPDelay,
 			Usage: "Delay between the starts of the HTTP server (use for HTTP-01 based challenges) and the validation of the challenge.",
 			Value: 0,
 		},
-		// &cli.StringFlag{
-		// 	Name:  flgHTTPProxyHeader,
-		// 	Usage: "Validate against this HTTP header when solving HTTP-01 based challenges behind a reverse proxy.",
-		// 	Value: "Host",
-		// },
 		&cli.StringFlag{
 			Name: flgHTTPWebroot,
 			Usage: "Set the webroot folder to use for HTTP-01 based challenges to write directly to the .well-known/acme-challenge file." +
 				" This disables the built-in server and expects the given directory to be publicly served with access to .well-known/acme-challenge",
 		},
-		// &cli.StringSliceFlag{
-		// 	Name:  flgHTTPMemcachedHost,
-		// 	Usage: "Set the memcached host(s) to use for HTTP-01 based challenges. Challenges will be written to all specified hosts.",
-		// },
-		// &cli.StringFlag{
-		// 	Name:  flgHTTPS3Bucket,
-		// 	Usage: "Set the S3 bucket name to use for HTTP-01 based challenges. Challenges will be written to the S3 bucket.",
-		// },
-		// &cli.BoolFlag{
-		// 	Name:  flgTLS,
-		// 	Usage: "Use the TLS-ALPN-01 challenge to solve challenges. Can be mixed with other types of challenges.",
-		// },
-		// &cli.StringFlag{
-		// 	Name:  flgTLSPort,
-		// 	Usage: "Set the port and interface to use for TLS-ALPN-01 based challenges to listen on. Supported: interface:port or :port.",
-		// 	Value: ":443",
-		// },
-		// &cli.DurationFlag{
-		// 	Name:  flgTLSDelay,
-		// 	Usage: "Delay between the start of the TLS listener (use for TLSALPN-01 based challenges) and the validation of the challenge.",
-		// 	Value: 0,
-		// },
-		// &cli.StringFlag{
-		// 	Name:  flgDNS,
-		// 	Usage: "Solve a DNS-01 challenge using the specified provider. Can be mixed with other types of challenges. Run 'lego dnshelp' for help on usage.",
-		// },
-		// &cli.BoolFlag{
-		// 	Name:  flgDNSDisableCP,
-		// 	Usage: fmt.Sprintf("(deprecated) use %s instead.", flgDNSPropagationDisableANS),
-		// },
-		// &cli.BoolFlag{
-		// 	Name:  flgDNSPropagationDisableANS,
-		// 	Usage: "By setting this flag to true, disables the need to await propagation of the TXT record to all authoritative name servers.",
-		// },
-		// &cli.BoolFlag{
-		// 	Name:  flgDNSPropagationRNS,
-		// 	Usage: "By setting this flag to true, use all the recursive nameservers to check the propagation of the TXT record.",
-		// },
-		// &cli.DurationFlag{
-		// 	Name:  flgDNSPropagationWait,
-		// 	Usage: "By setting this flag, disables all the propagation checks of the TXT record and uses a wait duration instead.",
-		// },
-		// &cli.StringSliceFlag{
-		// 	Name: flgDNSResolvers,
-		// 	Usage: "Set the resolvers to use for performing (recursive) CNAME resolving and apex domain determination." +
-		// 		" For DNS-01 challenge verification, the authoritative DNS server is queried directly." +
-		// 		" Supported: host:port." +
-		// 		" The default is to use the system resolvers, or Google's DNS resolvers if the system's cannot be determined.",
-		// },
+
 		&cli.IntFlag{
 			Name:  flgHTTPTimeout,
 			Usage: "Set the HTTP timeout value to a specific value in seconds.",
 		},
-		// &cli.BoolFlag{
-		// 	Name:  flgTLSSkipVerify,
-		// 	Usage: "Skip the TLS verification of the ACME server.",
-		// },
 		&cli.IntFlag{
 			Name:  flgDNSTimeout,
 			Usage: "Set the DNS timeout value to a specific value in seconds. Used only when performing authoritative name server queries.",
@@ -245,10 +183,6 @@ func CreateFlags(defaultPath string) []cli.Flag {
 			Usage: "ACME overall requests limit.",
 			Value: certificate.DefaultOverallRequestLimit,
 		},
-		// &cli.StringFlag{
-		// 	Name:  flgUserAgent,
-		// 	Usage: "Add to the user-agent sent to the CA to identify an application embedding lego-cli",
-		// },
 	}
 }
 
