@@ -36,6 +36,8 @@ func (w *HTTPProvider) Present(domain, token, keyAuth string) error {
 	err = os.WriteFile(challengeFilePath, []byte(keyAuth), 0o644)
 	if err != nil {
 		return fmt.Errorf("could not write file in webroot for HTTP challenge: %w", err)
+	} else {
+		fmt.Println("write file", challengeFilePath, "\n", keyAuth)
 	}
 
 	return nil

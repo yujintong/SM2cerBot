@@ -6,7 +6,6 @@ import (
 	"github.com/go-acme/lego/v4/certificate"
 	"github.com/go-acme/lego/v4/lego"
 	"github.com/urfave/cli/v2"
-	"software.sslmate.com/src/go-pkcs12"
 )
 
 // Flag names.
@@ -43,9 +42,6 @@ const (
 	flgTLSSkipVerify            = "tls-skip-verify"
 	flgDNSTimeout               = "dns-timeout"
 	flgPEM                      = "pem"
-	flgPFX                      = "pfx"
-	flgPFXPass                  = "pfx.pass"
-	flgPFXFormat                = "pfx.format"
 	flgCertTimeout              = "cert.timeout"
 	flgOverallRequestLimit      = "overall-request-limit"
 	flgUserAgent                = "user-agent"
@@ -156,23 +152,7 @@ func CreateFlags(defaultPath string) []cli.Flag {
 			Name:  flgPEM,
 			Usage: "Generate an additional .pem (base64) file by concatenating the .key and .crt files together.",
 		},
-		&cli.BoolFlag{
-			Name:    flgPFX,
-			Usage:   "Generate an additional .pfx (PKCS#12) file by concatenating the .key and .crt and issuer .crt files together.",
-			EnvVars: []string{envPFX},
-		},
-		&cli.StringFlag{
-			Name:    flgPFXPass,
-			Usage:   "The password used to encrypt the .pfx (PCKS#12) file.",
-			Value:   pkcs12.DefaultPassword,
-			EnvVars: []string{envPFXPassword},
-		},
-		&cli.StringFlag{
-			Name:    flgPFXFormat,
-			Usage:   "The encoding format to use when encrypting the .pfx (PCKS#12) file. Supported: RC2, DES, SHA256.",
-			Value:   "RC2",
-			EnvVars: []string{envPFXFormat},
-		},
+
 		&cli.IntFlag{
 			Name:  flgCertTimeout,
 			Usage: "Set the certificate timeout value to a specific value in seconds. Only used when obtaining certificates.",

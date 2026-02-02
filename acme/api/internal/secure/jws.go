@@ -91,6 +91,7 @@ func (j *JWS) SignEABContent(url, kid string, hmac []byte) (*jose.JSONWebSignatu
 		&jose.SignerOptions{
 			EmbedJWK: false,
 			ExtraHeaders: map[jose.HeaderKey]any{
+				// "alg": "HS256",
 				"kid": kid,
 				"url": url,
 			},

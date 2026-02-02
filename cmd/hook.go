@@ -9,8 +9,6 @@ import (
 	"os/exec"
 	"strings"
 	"time"
-
-	"github.com/go-acme/lego/v4/certificate"
 )
 
 const (
@@ -83,22 +81,4 @@ func metaToEnv(meta map[string]string) []string {
 	}
 
 	return envs
-}
-
-func addPathToMetadata(meta map[string]string, domain string, certRes *certificate.Resource, certsStorage *CertificatesStorage) {
-	meta[hookEnvCertDomain] = domain
-	meta[hookEnvCertPath] = certsStorage.GetFileName(domain, certExt)
-	meta[hookEnvCertKeyPath] = certsStorage.GetFileName(domain, keyExt)
-
-	if certRes.IssuerCertificate != nil {
-		meta[hookEnvIssuerCertKeyPath] = certsStorage.GetFileName(domain, issuerExt)
-	}
-
-	if certsStorage.pem {
-		meta[hookEnvCertPEMPath] = certsStorage.GetFileName(domain, pemExt)
-	}
-
-	if certsStorage.pfx {
-		meta[hookEnvCertPFXPath] = certsStorage.GetFileName(domain, pfxExt)
-	}
 }
