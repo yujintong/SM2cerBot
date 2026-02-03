@@ -114,14 +114,6 @@ func CreateCSR(keyType KeyType, keyBits int, req CertRequest) (csrBaseUrl string
 		}
 	}
 
-	// 编码 CSR 为 PEM 格式
-	// csrbase := pem.EncodeToMemory(&pem.Block{
-	// 	Type:  "CERTIFICATE REQUEST",
-	// 	Bytes: csrDER,
-	// })
-
-	// fmt.Printf(string(csrbase))
-
 	csrPEM := csrToBase64URL(csrDER)
 
 	// 编码私钥为 PEM 格式
@@ -157,7 +149,7 @@ func encodePrivateKey(privateKey interface{}, keyType KeyType) ([]byte, error) {
 			return nil, err
 		}
 	case SM2:
-		pemType = "SM2 PRIVATE KEY"
+		pemType = "EC PRIVATE KEY"
 		sm2Key := privateKey.(*sm2.PrivateKey)
 		keyBytes, err = gmx509.MarshalSm2UnecryptedPrivateKey(sm2Key)
 		if err != nil {

@@ -1,53 +1,59 @@
 <div align="center">
-  <p>Automatic Certificates and HTTPS for everyone.</p>
+  <p>国密ACME客户端</p>
 </div>
 
-# Lego
+# SM2cerBot
 
-Let's Encrypt client and ACME library written in Go.
+这是一个基于《自动化证书管理规范》密码行业标准草案V6版本开发的开源ACME客户端软件，默认自动对接零信技术提供的国密ACME公共服务，自动申请证书、取回证书、部署证书和续期证书。双算法SSL证书都是90天有效期证书，国际SSL证书全球信任，所有浏览器信任；国密SSL证书国密合规，所有国密浏览器都信任，推荐使用完全免费的零信浏览器，优先采用国密算法实现HTTPS加密。
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/go-acme/lego/v4.svg)](https://pkg.go.dev/github.com/go-acme/lego/v4)
-[![Build Status](https://github.com//go-acme/lego/workflows/Main/badge.svg?branch=master)](https://github.com//go-acme/lego/actions)
-[![Docker Pulls](https://img.shields.io/docker/pulls/goacme/lego.svg)](https://hub.docker.com/r/goacme/lego/)
+本项目基于 [LEGO](https://github.com/go-acme/lego) 改造
 
-lego is an independent, free, and open-source project, if you value it, consider [supporting it](https://donate.ldez.dev)! ❤️
-
-Everybody thinks that the others will donate, but in the end, nobody does.
-
-So if you think that lego is worth it, please consider [donating](https://donate.ldez.dev).
-
-## Features
-
-- ACME v2 [RFC 8555](https://www.rfc-editor.org/rfc/rfc8555.html)
-  - Support [RFC 8737](https://www.rfc-editor.org/rfc/rfc8737.html): TLS Application‑Layer Protocol Negotiation (ALPN) Challenge Extension
-  - Support [RFC 8738](https://www.rfc-editor.org/rfc/rfc8738.html): certificates for IP addresses
-  - Support [RFC 9773](https://www.rfc-editor.org/rfc/rfc9773.html): Renewal Information (ARI) Extension
-  - Support [draft-ietf-acme-profiles-00](https://datatracker.ietf.org/doc/draft-ietf-acme-profiles/): Profiles Extension
-- Comes with about [170 DNS providers](https://go-acme.github.io/lego/dns)
-- Register with CA
-- Obtain certificates, both from scratch or with an existing CSR
-- Renew certificates
-- Revoke certificates
-- Robust implementation of ACME challenges:
-  - HTTP (http-01)
-  - DNS (dns-01)
-  - TLS (tls-alpn-01)
-- SAN certificate support
-- [CNAME support](https://letsencrypt.org/2019/10/09/onboarding-your-customers-with-lets-encrypt-and-acme.html) by default
-- [Custom challenge solvers](https://go-acme.github.io/lego/usage/library/writing-a-challenge-solver/)
-- Certificate bundling
-- OCSP helper function
-
-
-If your DNS provider is not supported, please open an [issue](https://github.com/go-acme/lego/issues/new?assignees=&labels=enhancement%2C+new-provider&template=new_dns_provider.yml).
-
-
-## BUILD
+## 编译
 
 - make build
+- 编译后文件在dist目录下
 
+## 运行准备条件（nginx）
+- 
+- 1.在nginx的服务上添加location, 包括（80和443端口）
+-  'location /.well-known/pki-validation/ {
+-        root /opt/acme/webroot ;       # http.webroot 指定路径，自定义
+-    }'
+-  配置后重启nginx
+- 
+- 
+-  2.添加run-hook脚本文件(hook.sh)
+-  '
+-  #!/bin/bash
+-  sudo nginx -s reload
+-  echo "hook file run success"
+-  '
+-  修改文件属性  chmod +x hook.sh
+- 
+- 
+-  3.kid是acme的外部账号，请在网站 (https://zotrus.com) 上注册
+- 
+- 
+-  4.hmac是acme的外部账号token，请在网站 (https://zotrus.com) 用户中心查看
+- 
 
-## USING
-
+## 运行 
  - RUN
- - SM2cerBot --email=
+ - ./SM2cerBot --email=email@domain.com --eab  --kid=email@domain.com   --hmac=token    --domains=youdomain.com    --path=/opt/acme   --http    --http.webroot=/opt/acme/webroot  --run-hook=/workspace/acme/hook.sh  run
+
+## 证书签发后配置
+ - 修改证书引用地址(nginx), 证书签发后存放在path目录下 例如 /opt/acme/certificates
+ - 
+ -   ssl_certificate          /opt/acme/certificates/youdomain_ecc.crt;
+ -   ssl_certificate_key      /opt/acme/certificates/youdomain_ecc_ecc.key;
+ -   ssl_sign_certificate     /opt/acme/certificates/youdomain_ecc_sign.crt;
+ -   ssl_sign_certificate_key /opt/acme/certificates/youdomain_ecc_sign.key;
+ -   ssl_enc_certificate      /opt/acme/certificates/youdomain_ecc_enc.crt;
+ -   ssl_enc_certificate_key  /opt/acme/certificates/sm2acmetest.cersign.cn_enc.key;
+ - 
+ - 
+ 
+ ## 续订
+ -  
+ - Renew
+ - ./SM2cerBot --email=email@domain.com --eab  --kid=email@domain.com   --hmac=token    --domains=youdomain.com    --path=/opt/acme    --http --days=80 --http.webroot=/opt/acme/webroot   --renew-hook=/workspace/acme/hook.sh renew

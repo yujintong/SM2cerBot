@@ -16,7 +16,11 @@ type HTTPProvider struct {
 // NewHTTPProvider returns a HTTPProvider instance with a configured webroot path.
 func NewHTTPProvider(path string) (*HTTPProvider, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, errors.New("webroot path does not exist")
+
+		err = os.MkdirAll(filepath.Dir(path), 0o755)
+		if err != nil {
+			return nil, errors.New("webroot path does not exist")
+		}
 	}
 
 	return &HTTPProvider{path: path}, nil
@@ -37,7 +41,7 @@ func (w *HTTPProvider) Present(domain, token, keyAuth string) error {
 	if err != nil {
 		return fmt.Errorf("could not write file in webroot for HTTP challenge: %w", err)
 	} else {
-		fmt.Println("write file", challengeFilePath, "\n", keyAuth)
+		// fmt.Println("write file", challengeFilePath, "\n", keyAuth)
 	}
 
 	return nil
