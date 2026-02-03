@@ -2,7 +2,7 @@
 
 这是一个基于《自动化证书管理规范》密码行业标准草案V6版本开发的开源ACME客户端软件，默认自动对接零信技术提供的国密ACME公共服务，自动申请证书、取回证书、部署证书和续期证书。
 
-[零信国密ACME公共服务网址](https://my.zotrus.com/cnacme)
+零信国密ACME公共服务网址:https://my.zotrus.com/cnacme
 
 ## 特性
 
@@ -55,8 +55,8 @@ chmod +x hook.sh
 
 ### ACME 账户配置
 
-- `kid` 是 ACME 的外部账号，请在网站 [ZoTrus](https://zotrus.com) 上注册
-- `hmac` 是 ACME 的外部账号 token，请在网站 [ZoTrus](https://zotrus.com) 用户中心查看
+- `kid` 是 ACME 的外部账号，是您在网站 [ZoTrus](https://zotrus.com) 上注册的邮箱
+- `hmac` 是 ACME 的外部账号 token，您可在网站 [ZoTrus](https://zotrus.com) 用户中心获取
 
 ## 运行
 
