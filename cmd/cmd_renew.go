@@ -1,0 +1,369 @@
+package cmd
+
+import (
+	"crypto/x509"
+	"errors"
+	"math/rand"
+	"net"
+	"os"
+	"slices"
+	"sync"
+	"time"
+
+	"github.com/go-acme/lego/v4/acme"
+	"github.com/go-acme/lego/v4/acme/api"
+	"github.com/go-acme/lego/v4/certcrypto"
+	"github.com/go-acme/lego/v4/certificate"
+	"github.com/go-acme/lego/v4/lego"
+	"github.com/go-acme/lego/v4/log"
+	"github.com/mattn/go-isatty"
+	"github.com/urfave/cli/v2"
+)
+
+// Flag names.
+const (
+	flgRenewDays              = "days"
+	flgRenewDynamic           = "dynamic"
+	flgARIDisable             = "ari-disable"
+	flgARIWaitToRenewDuration = "ari-wait-to-renew-duration"
+	flgReuseKey               = "reuse-key"
+	flgRenewHook              = "renew-hook"
+	flgRenewHookTimeout       = "renew-hook-timeout"
+	flgNoRandomSleep          = "no-random-sleep"
+	flgForceCertDomains       = "force-cert-domains"
+)
+
+func createRenew() *cli.Command {
+	return &cli.Command{
+		Name:   "renew",
+		Usage:  "Renew a certificate",
+		Action: renew,
+		Before: func(ctx *cli.Context) error {
+			// we require either domains or csr, but not both
+			hasDomains := len(ctx.StringSlice(flgDomains)) > 0
+
+			hasCsr := ctx.String(flgCSR) != ""
+			if hasDomains && hasCsr {
+				log.Fatalf("Please specify either --%s/-d or --%s/-c, but not both", flgDomains, flgCSR)
+			}
+
+			if !hasDomains && !hasCsr {
+				log.Fatalf("Please specify --%s/-d (or --%s/-c if you already have a CSR)", flgDomains, flgCSR)
+			}
+
+			if ctx.Bool(flgForceCertDomains) && hasCsr {
+				log.Fatalf("--%s only works with --%s/-d, --%s/-c doesn't support this option.", flgForceCertDomains, flgDomains, flgCSR)
+			}
+
+			return nil
+		},
+		Flags: []cli.Flag{
+			&cli.IntFlag{
+				Name:  flgRenewDays,
+				Value: 15,
+				Usage: "The number of days left on a certificate to renew it.",
+			},
+			// TODO(ldez): in v5, remove this flag, use this behavior as default.
+			&cli.BoolFlag{
+				Name:  flgRenewDynamic,
+				Value: false,
+				Usage: "Compute dynamically, based on the lifetime of the certificate(s), when to renew: use 1/3rd of the lifetime left, or 1/2 of the lifetime for short-lived certificates). This supersedes --days and will be the default behavior in Lego v5.",
+			},
+			&cli.BoolFlag{
+				Name:  flgARIDisable,
+				Usage: "Do not use the renewalInfo endpoint (RFC9773) to check if a certificate should be renewed.",
+			},
+			&cli.DurationFlag{
+				Name:  flgARIWaitToRenewDuration,
+				Usage: "The maximum duration you're willing to sleep for a renewal time returned by the renewalInfo endpoint.",
+			},
+
+			&cli.StringFlag{
+				Name:  flgRenewHook,
+				Usage: "Define a hook. The hook is executed only when the certificates are effectively renewed.",
+			},
+			&cli.DurationFlag{
+				Name:  flgRenewHookTimeout,
+				Usage: "Define the timeout for the hook execution.",
+				Value: 2 * time.Minute,
+			},
+			&cli.BoolFlag{
+				Name: flgNoRandomSleep,
+				Usage: "Do not add a random sleep before the renewal." +
+					" We do not recommend using this flag if you are doing your renewals in an automated way.",
+			},
+			&cli.BoolFlag{
+				Name:  flgForceCertDomains,
+				Usage: "Check and ensure that the cert's domain list matches those passed in the domains argument.",
+			},
+		},
+	}
+}
+
+func renew(ctx *cli.Context) error {
+	account, keyType := setupAccount(ctx, NewAccountsStorage(ctx))
+
+	if account.Registration == nil {
+		log.Fatalf("Account %s is not registered. Use 'run' to register a new account.\n", account.Email)
+	}
+
+	certsStorage := NewCertificatesStorage(ctx)
+
+	bundle := !ctx.Bool(flgNoBundle)
+
+	meta := map[string]string{hookEnvAccountEmail: account.Email}
+
+	// Domains
+	return renewForDomains(ctx, account, keyType, certsStorage, bundle, meta)
+}
+
+func renewForDomains(ctx *cli.Context, account *Account, keyType certcrypto.KeyType, certsStorage *CertificatesStorage, bundle bool, meta map[string]string) error {
+	domains := ctx.StringSlice(flgDomains)
+	// domain := domains[0]
+	client := setupClient(ctx, account, keyType)
+
+	var wg sync.WaitGroup
+	for _, domain := range domains {
+		wg.Add(1)
+		go renewDomainCheck(ctx, domain, client, certsStorage, &wg)
+	}
+
+	wg.Wait()
+
+	return launchHook(ctx.String(flgRenewHook), ctx.Duration(flgRenewHookTimeout), meta)
+}
+
+func renewDomainCheck(ctx *cli.Context, domain string, client *lego.Client, certsStorage *CertificatesStorage, wg *sync.WaitGroup) {
+
+	defer wg.Done()
+
+	// load the cert resource from files.
+	// We store the certificate, private key and metadata in different files
+	// as web servers would not be able to work with a combined file.
+	certificates, err := certsStorage.ReadCertificate(domain, certExt)
+	if err != nil {
+		log.Fatalf("Error while loading the certificate for domain %s\n\t%v", domain, err)
+	}
+
+	cert := certificates[0]
+
+	var (
+		ariRenewalTime *time.Time
+		// replacesCertID string
+	)
+
+	if !ctx.Bool(flgARIDisable) {
+		ariRenewalTime = getARIRenewalTime(ctx, cert, domain, client)
+		if ariRenewalTime != nil {
+			now := time.Now().UTC()
+
+			// Figure out if we need to sleep before renewing.
+			if ariRenewalTime.After(now) {
+				log.Infof("[%s] Sleeping %s until renewal time %s", domain, ariRenewalTime.Sub(now), ariRenewalTime)
+				time.Sleep(ariRenewalTime.Sub(now))
+			}
+		}
+	}
+
+	if ariRenewalTime == nil && !needRenewal(cert, domain, ctx.Int(flgRenewDays), ctx.Bool(flgRenewDynamic)) {
+		return
+	}
+
+	// This is just meant to be informal for the user.
+	timeLeft := cert.NotAfter.Sub(time.Now().UTC())
+	log.Infof("[%s] acme: Trying renewal with %d hours remaining", domain, int(timeLeft.Hours()))
+
+	// https://github.com/go-acme/lego/issues/1656
+	// https://github.com/certbot/certbot/blob/284023a1b7672be2bd4018dd7623b3b92197d4b0/certbot/certbot/_internal/renewal.py#L435-L440
+	if !isatty.IsTerminal(os.Stdout.Fd()) && !ctx.Bool(flgNoRandomSleep) {
+		// https://github.com/certbot/certbot/blob/284023a1b7672be2bd4018dd7623b3b92197d4b0/certbot/certbot/_internal/renewal.py#L472
+		const jitter = 8 * time.Minute
+
+		rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+		sleepTime := time.Duration(rnd.Int63n(int64(jitter)))
+
+		log.Infof("renewal: random delay of %s", sleepTime)
+	}
+
+	err = renewCertificate(domain, ctx, client, certsStorage)
+	if err != nil {
+		// Make sure to return a non-zero exit code if ObtainSANCertificate returned at least one error.
+		// Due to us not returning partial certificate we can just exit here instead of at the end.
+		log.Println("Could not obtain certificates:\n\t%v", err)
+	}
+}
+
+func needRenewal(x509Cert *x509.Certificate, domain string, days int, dynamic bool) bool {
+	if x509Cert.IsCA {
+		log.Fatalf("[%s] Certificate bundle starts with a CA certificate", domain)
+	}
+
+	if dynamic {
+		return needRenewalDynamic(x509Cert, domain, time.Now())
+	}
+
+	if days < 0 {
+		return true
+	}
+
+	notAfter := int(time.Until(x509Cert.NotAfter).Hours() / 24.0)
+	if notAfter <= days {
+		return true
+	}
+
+	log.Printf("[%s] The certificate expires in %d days, the number of days defined to perform the renewal is %d: no renewal.",
+		domain, notAfter, days)
+
+	return false
+}
+
+func needRenewalDynamic(x509Cert *x509.Certificate, domain string, now time.Time) bool {
+	lifetime := x509Cert.NotAfter.Sub(x509Cert.NotBefore)
+
+	var divisor int64 = 3
+	if lifetime.Round(24*time.Hour).Hours()/24.0 <= 10 {
+		divisor = 2
+	}
+
+	dueDate := x509Cert.NotAfter.Add(-1 * time.Duration(lifetime.Nanoseconds()/divisor))
+
+	if dueDate.Before(now) {
+		return true
+	}
+
+	log.Infof("[%s] The certificate expires at %s, the renewal can be performed in %s: no renewal.",
+		domain, x509Cert.NotAfter.Format(time.RFC3339), dueDate.Sub(now))
+
+	return false
+}
+
+// getARIRenewalTime checks if the certificate needs to be renewed using the renewalInfo endpoint.
+func getARIRenewalTime(ctx *cli.Context, cert *x509.Certificate, domain string, client *lego.Client) *time.Time {
+	if cert.IsCA {
+		log.Fatalf("[%s] Certificate bundle starts with a CA certificate", domain)
+	}
+
+	renewalInfo, err := client.Certificate.GetRenewalInfo(certificate.RenewalInfoRequest{Cert: cert})
+	if err != nil {
+		if errors.Is(err, api.ErrNoARI) {
+			// The server does not advertise a renewal info endpoint.
+			log.Warnf("[%s] acme: %v", domain, err)
+			return nil
+		}
+
+		log.Warnf("[%s] acme: calling renewal info endpoint: %v", domain, err)
+
+		return nil
+	}
+
+	now := time.Now().UTC()
+
+	renewalTime := renewalInfo.ShouldRenewAt(now, ctx.Duration(flgARIWaitToRenewDuration))
+	if renewalTime == nil {
+		log.Infof("[%s] acme: renewalInfo endpoint indicates that renewal is not needed", domain)
+		return nil
+	}
+
+	log.Infof("[%s] acme: renewalInfo endpoint indicates that renewal is needed", domain)
+
+	if renewalInfo.ExplanationURL != "" {
+		log.Infof("[%s] acme: renewalInfo endpoint provided an explanation: %s", domain, renewalInfo.ExplanationURL)
+	}
+
+	return renewalTime
+}
+
+func merge(prevDomains, nextDomains []string) []string {
+	for _, next := range nextDomains {
+		if slices.Contains(prevDomains, next) {
+			continue
+		}
+
+		prevDomains = append(prevDomains, next)
+	}
+
+	return prevDomains
+}
+
+func renewCertificate(domain string, ctx *cli.Context, client *lego.Client, certificatesStorage *CertificatesStorage) error {
+
+	var challengeType string
+	if ctx.Bool(flgHTTP) {
+		challengeType = "http-01"
+	}
+	if ctx.Bool(flgTLS) {
+		challengeType = "dns-01"
+	}
+
+	if ctx.IsSet(flgDNS) {
+		challengeType = "tls-sni-01"
+	}
+
+	domaintype := "ip"
+	ip := net.ParseIP(domain)
+	if ip == nil {
+		domaintype = "dns"
+	}
+
+	var identifiers = []acme.Identifier{
+		{
+			Type:          domaintype,
+			Value:         domain,
+			ChallengeType: challengeType,
+		},
+	}
+
+	req := acme.CertRequest{
+		CommonName: domain,
+	}
+
+	eccCsr, ecckey, err := acme.CreateCSR(acme.ECC, 256, req)
+	if err != nil {
+		log.Fatalf("Failed to create ECC CSR: %v", err)
+	}
+
+	sm2SignCsr, signkey, err := acme.CreateCSR(acme.SM2, 256, req)
+	if err != nil {
+		log.Fatalf("Failed to create SM2 CSR: %v", err)
+	}
+
+	sm2EncCsr, enckey, err := acme.CreateCSR(acme.SM2, 256, req)
+	if err != nil {
+		log.Fatalf("Failed to create SM2 CSR: %v", err)
+	}
+
+	request := api.OrderWithCsrOptions{
+		Csr:         eccCsr,
+		CsrSign:     sm2SignCsr,
+		CsrEncrypt:  sm2EncCsr,
+		Identifiers: identifiers,
+	}
+
+	order, err := client.Certificate.ObtainForSm2(domain, request)
+	if err != nil {
+		log.Logger.Fatalf("Failed to send order request: %v", err)
+		return err
+	}
+
+	certs, err := client.Certificate.GetSm2OrderStatus(domain, order)
+
+	if err != nil {
+		log.Logger.Fatalf("Failed to send order request: %v", err)
+	}
+
+	for k, v := range certs {
+		// fmt.Printf("url:%s\n %s%s\n\n", k, string(v.Cert), string(v.Issuer))
+		bys := append(v.Cert, v.Issuer...)
+
+		switch {
+		case k == "intcert":
+			certificatesStorage.SaveCertificate(domain, "_ecc", bys, ecckey)
+		case k == "sm2sign":
+			certificatesStorage.SaveCertificate(domain, "_sign", bys, signkey)
+		case k == "sm2enc":
+			certificatesStorage.SaveCertificate(domain, "_enc", bys, enckey)
+		}
+	}
+
+	return nil
+}
