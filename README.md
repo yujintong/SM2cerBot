@@ -92,3 +92,16 @@ chmod +x hook.sh
   --renew-hook=/workspace/acme/hook.sh \
   renew
 ```
+
+### 证书签发后配置
+
+- 修改证书引用地址(nginx), 证书签发后存放在path目录下 例如 /opt/acme/certificates
+
+```bash
+  ssl_certificate          /opt/acme/certificates/youdomain.com_ecc.crt;
+  ssl_certificate_key      /opt/acme/certificates/youdomain.com_ecc_ecc.key;
+  ssl_sign_certificate     /opt/acme/certificates/youdomain.com_sign.crt;
+  ssl_sign_certificate_key /opt/acme/certificates/youdomain.com_sign.key;
+  ssl_enc_certificate      /opt/acme/certificates/youdomain.com_enc.crt;
+  ssl_enc_certificate_key  /opt/acme/certificates/youdomain.com_enc.key;
+```
