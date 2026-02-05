@@ -99,7 +99,7 @@ chmod +x hook.sh
 
 ```bash
   ssl_certificate          /opt/acme/certificates/youdomain.com_ecc.crt;
-  ssl_certificate_key      /opt/acme/certificates/youdomain.com_ecc_ecc.key;
+  ssl_certificate_key      /opt/acme/certificates/youdomain.com_ecc.key;
   ssl_sign_certificate     /opt/acme/certificates/youdomain.com_sign.crt;
   ssl_sign_certificate_key /opt/acme/certificates/youdomain.com_sign.key;
   ssl_enc_certificate      /opt/acme/certificates/youdomain.com_enc.crt;
