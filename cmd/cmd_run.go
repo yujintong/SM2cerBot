@@ -158,8 +158,7 @@ func obtainDomainCertificate(domain string, ctx *cli.Context, client *lego.Clien
 
 		_, err := net.LookupHost(domain)
 		if err != nil {
-
-			log.Warnf("[%s] domain name resolution failed")
+			log.Fatalf("[%s] domain name resolution failed", domain)
 			return err
 		}
 	}
