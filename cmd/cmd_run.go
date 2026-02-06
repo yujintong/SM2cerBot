@@ -155,6 +155,13 @@ func obtainDomainCertificate(domain string, ctx *cli.Context, client *lego.Clien
 	ip := net.ParseIP(domain)
 	if ip == nil {
 		domaintype = "dns"
+
+		_, err := net.LookupHost(domain)
+		if err != nil {
+
+			log.Warnf("[%s] domain name resolution failed")
+			return err
+		}
 	}
 
 	var identifiers = []acme.Identifier{
