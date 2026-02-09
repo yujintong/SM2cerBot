@@ -337,6 +337,9 @@ func renewCertificate(domain string, ctx *cli.Context, client *lego.Client, cert
 		CsrSign:     sm2SignCsr,
 		CsrEncrypt:  sm2EncCsr,
 		Identifiers: identifiers,
+
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(90 * 24 * time.Hour),
 	}
 
 	order, err := client.Certificate.ObtainForSm2(domain, request)
