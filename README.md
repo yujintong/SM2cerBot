@@ -72,9 +72,9 @@ chmod +x hook.sh
   --domains=youdomain.com \
   --path=/opt/acme \
   --http \
+  run \
   --http.webroot=/opt/acme/webroot \
-  --run-hook=/workspace/acme/hook.sh \
-  run
+  --run-hook=/workspace/acme/hook.sh 
 ```
 
 ### 续订证书
@@ -88,10 +88,10 @@ chmod +x hook.sh
   --domains=youdomain.com \
   --path=/opt/acme \
   --http \
+  renew \
   --days=80 \
   --http.webroot=/opt/acme/webroot \
-  --renew-hook=/workspace/acme/hook.sh \
-  renew
+  --renew-hook=/workspace/acme/hook.sh 
 ```
 
 ### 证书签发后配置
