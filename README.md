@@ -72,8 +72,8 @@ chmod +x hook.sh
   --domains=youdomain.com \
   --path=/opt/acme \
   --http \
-  run \
   --http.webroot=/opt/acme/webroot \
+  run \
   --run-hook=/workspace/acme/hook.sh 
 ```
 
@@ -87,10 +87,10 @@ chmod +x hook.sh
   --hmac=token \
   --domains=youdomain.com \
   --path=/opt/acme \
+  --days=80 \  
   --http \
-  renew \
-  --days=80 \
   --http.webroot=/opt/acme/webroot \
+  renew \
   --renew-hook=/workspace/acme/hook.sh 
 ```
 
